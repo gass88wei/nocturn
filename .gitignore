@@ -1,0 +1,25 @@
+# OS & Editor
+.DS_Store
+.idea/
+.vscode/
+
+# Pi & Local Agent Artifacts
+.pi/
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies & Build Outputs
+node_modules/
+dist/
+build/
+.next/
+.turbo/
+coverage/
+
+# Go binaries & test cache
+server/bin/
+*.test
+*.out
