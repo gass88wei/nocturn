@@ -119,6 +119,9 @@ export interface AgentRun {
   agentId: string;
   isLeaderTurn: boolean;
   status: RunStatus;
+  /** Fencing token to prevent split-brain double execution when a timed-out Run is reclaimed */
+  leaseToken: string;
+  leaseExpiresAt: string;
   summary: string;
   steps: RunTraceStep[];
   verdict: VerdictReport | null;
@@ -146,6 +149,8 @@ export interface Task {
 
 export interface ExternalTrigger {
   id: string;
+  /** Idempotency key (e.g. GitHub X-GitHub-Delivery or source:type:id) */
+  eventKey: string;
   threadKey: string;
   actor: string;
   text: string;

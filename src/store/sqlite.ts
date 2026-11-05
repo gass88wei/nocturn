@@ -74,6 +74,7 @@ export class NocturnStore {
       );
       CREATE TABLE IF NOT EXISTS triggers (
         id TEXT PRIMARY KEY,
+        event_key TEXT NOT NULL UNIQUE,
         thread_key TEXT NOT NULL,
         data TEXT NOT NULL
       );
@@ -212,11 +213,14 @@ export class NocturnStore {
     return rows.map((r) => JSON.parse(r.data) as AgentRun);
   }
 
-  listRunsForAgent(agentId: string): AgentRun[] {
-    const rows = this.db
-      .prepare("SELECT data FROM runs WHERE agent_id = ?")
-      .all(agentId) as Array<{ data: string }>;
+  listAllRuns(): AgentRun[] {
+    const rows = this.db.prepare("SELECT data FROM runs").all() as Array<{ data: string }>;
     return rows.map((r) => JSON.parse(r.data) as AgentRun);
+  }
+
+  listAllInputs(): TaskInput[] {
+    const rows = this.db.prepare("SELECT data FROM inputs").all() as Array<{ data: string }>;
+    return rows.map((r) => JSON.parse(r.data) as TaskInput);
   }
 
   saveInput(input: TaskInput): void {
@@ -243,8 +247,15 @@ export class NocturnStore {
 
   saveTrigger(trigger: ExternalTrigger): void {
     this.db
-      .prepare("INSERT OR REPLACE INTO triggers (id, thread_key, data) VALUES (?, ?, ?)")
-      .run(trigger.id, trigger.threadKey, JSON.stringify(trigger));
+      .prepare("INSERT OR REPLACE INTO triggers (id, event_key, thread_key, data) VALUES (?, ?, ?, ?)")
+      .run(trigger.id, trigger.eventKey, trigger.threadKey, JSON.stringify(trigger));
+  }
+
+  getTriggerByEventKey(eventKey: string): ExternalTrigger | undefined {
+    const row = this.db
+      .prepare("SELECT data FROM triggers WHERE event_key = ?")
+      .get(eventKey) as { data: string } | undefined;
+    return row ? (JSON.parse(row.data) as ExternalTrigger) : undefined;
   }
 
   getTrigger(id: string): ExternalTrigger | undefined {

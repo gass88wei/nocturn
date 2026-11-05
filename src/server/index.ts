@@ -6,15 +6,16 @@ import { NocturnStore } from "../store/sqlite.ts";
 import { NocturnEngine } from "../core/engine.ts";
 import { SotaPiRunner } from "../daemon/pi-runner.ts";
 import { executeAgentCliCommand } from "../tools/nocturn-cli.ts";
+import { ingestGitHubWebhook, type GitHubWebhookEvent } from "../sources/github.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sqlite")) {
   const store = new NocturnStore(dbPath);
   const engine = new NocturnEngine(store);
-  const runner = new SotaPiRunner(engine, { dryRun: true });
+  const runner = new SotaPiRunner(engine, { dryRun: false });
 
-  // Seed default squads & agents if empty
+  // Seed default squads, agents, and initial tasks if empty
   if (store.listSquads().length === 0) {
     store.saveSquad({
       id: "dev",
@@ -60,6 +61,49 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       skills: ["review", "regression-test"],
       instructions: "审查 PR 并提交结构化 Verdict。",
     });
+    store.saveAgent({
+      id: "ops-leader",
+      name: "运维小队队长",
+      squadId: "ops",
+      role: "leader",
+      cli: "pi",
+      model: "gemini-4-argon-high",
+      skills: ["dispatch", "ops"],
+      instructions: "协调压测与巡检任务。",
+    });
+    store.saveAgent({
+      id: "bench-worker",
+      name: "pi-bench",
+      squadId: "ops",
+      role: "worker",
+      cli: "pi",
+      model: "gemini-4-argon-high",
+      skills: ["benchmark"],
+      instructions: "在 sota 节点执行长会话稳定性压测。",
+    });
+
+    // Seed initial task #427
+    const t427 = engine.createTask({
+      identifier: "TASK-427",
+      title: "#427 仓库页预览与二部图重构",
+      description: "在独立 worktree 中完成二部图与右侧抽屉重构",
+      squadId: "dev",
+    });
+    engine.dispatchTask({
+      taskId: t427.id,
+      workerAgentId: "pi-coder",
+      orderText: "完成二部图重构并补充单测",
+    });
+    engine.reportVerdict({
+      taskId: t427.id,
+      agentId: "pi-coder",
+      state: "progress",
+      summary: "已完成 SVG 曲线改造，正在补桌面端单测",
+      humanAction: "屏幕宽度小于 960px 时，右侧抽屉用浮层覆盖还是上下分栏折叠？",
+      humanActionOptions: ["做成右侧浮层覆盖 (Overlay)", "做成上下分栏折叠"],
+      prNumber: 112,
+    });
+    void runner.processPendingEffects();
   }
 
   async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -70,7 +114,10 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
   }
 
   function sendJson(res: ServerResponse, status: number, payload: unknown): void {
-    res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+    res.writeHead(status, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
     res.end(JSON.stringify(payload, null, 2));
   }
 
@@ -91,6 +138,8 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
           agents: store.listAgents(),
           tasks: store.listTasks(),
           sessions: store.listSessions(),
+          runs: store.listAllRuns(),
+          inputs: store.listAllInputs(),
           pendingEffects: store.listPendingEffects(),
         });
         return;
@@ -145,6 +194,67 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
         });
         await runner.processPendingEffects();
         sendJson(res, 200, task);
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/webhooks/github") {
+        const body = (await readJsonBody(req)) as unknown as GitHubWebhookEvent;
+        const result = ingestGitHubWebhook(engine, body);
+        await runner.processPendingEffects();
+        sendJson(res, 200, result);
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/sweep") {
+        const reclaimed = engine.sweepStaleRuns();
+        await runner.processPendingEffects();
+        sendJson(res, 200, { reclaimedCount: reclaimed.length, reclaimed });
+        return;
+      }
+
+      // Execute a real turn on remote sota server using Pi 1.5.0 (--session-id <uuid>)
+      if (req.method === "POST" && url.pathname === "/api/sota/exec") {
+        const body = await readJsonBody(req);
+        const task = store.getTask(String(body.taskId ?? "TASK-427"));
+        if (!task) throw new Error("Task not found");
+        const agentId = String(body.agentId ?? task.assignedWorkerId ?? task.leaderAgentId);
+        const session = engine.ensureSession(agentId, task.id);
+        await runner.processPendingEffects();
+        const refreshedSession = store.getSession(session.id)!;
+
+        const promptText = String(body.prompt ?? "汇报当前工作目录与状态，简短回答。");
+        engine.sendInput({
+          taskId: task.id,
+          targetAgentId: agentId,
+          author: "yangxin",
+          mode: "steer",
+          text: promptText,
+        });
+
+        const sotaRes = await runner.runLiveOnSota({
+          worktreePath: refreshedSession.worktreePath,
+          piSessionId: refreshedSession.piSessionId!,
+          prompt: promptText,
+        });
+
+        const activeRunId = store.getSession(session.id)?.activeRunId;
+        if (activeRunId) {
+          engine.markDeliveredInputsReadForRun(activeRunId);
+          const run = store.getRun(activeRunId)!;
+          run.steps.push({
+            badge: "步骤",
+            text: `[sota Pi 1.5.0 真实回复] ${sotaRes.assistantText}`,
+            timestamp: new Date().toISOString(),
+          });
+          store.saveRun(run);
+        }
+
+        sendJson(res, 200, {
+          ok: true,
+          piSessionId: refreshedSession.piSessionId,
+          worktreePath: refreshedSession.worktreePath,
+          sotaReply: sotaRes.assistantText,
+        });
         return;
       }
 

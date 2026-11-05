@@ -4,6 +4,7 @@ import { NocturnStore } from "../src/store/sqlite.ts";
 import { NocturnEngine } from "../src/core/engine.ts";
 import { SotaPiRunner } from "../src/daemon/pi-runner.ts";
 import { executeAgentCliCommand } from "../src/tools/nocturn-cli.ts";
+import { ingestGitHubWebhook } from "../src/sources/github.ts";
 
 function setupSeededEngine() {
   const store = new NocturnStore(":memory:");
@@ -111,8 +112,88 @@ describe("Nocturn Core Engine & Distilled Mechanisms", () => {
     assert.notEqual(resumedSession.activeRunId, workerRun.id);
     const run2 = store.getRun(resumedSession.activeRunId!)!;
     assert.ok(
-      run2.steps[0].text.includes(`--resume ${firstPiSessionId}`),
+      run2.steps[0].text.includes(`--session-id ${firstPiSessionId}`),
       "Run 2 explicitly resumes native Pi session ID"
+    );
+  });
+
+  it("V2 & V3: GitHub Webhook idempotency, CI failure auto-wakeup, and Lease Fencing / Sweeper self-healing", () => {
+    const { store, engine } = setupSeededEngine();
+
+    // 1. GitHub Issue opened webhook creates GH-501; duplicate deliveryId is idempotent
+    const firstDelivery = ingestGitHubWebhook(engine, {
+      deliveryId: "deliv-1001",
+      event: "issues",
+      action: "opened",
+      sender: "yangxin",
+      issueNumber: 501,
+      title: "修复并发 Cookie 覆盖问题",
+      body: "高并发下存在覆盖",
+    });
+    assert.equal(firstDelivery.status, "created_task");
+
+    const dupDelivery = ingestGitHubWebhook(engine, {
+      deliveryId: "deliv-1001",
+      event: "issues",
+      action: "opened",
+      sender: "yangxin",
+      issueNumber: 501,
+      title: "修复并发 Cookie 覆盖问题",
+    });
+    assert.equal(dupDelivery.status, "duplicate");
+    assert.equal(store.listTasks().length, 1, "Duplicate webhook must not create duplicate tasks");
+
+    // 2. Dispatch to pi-coder, report ready with PR #202 (Run 1 exits)
+    const task = store.getTask("GH-501")!;
+    engine.dispatchTask({
+      taskId: task.id,
+      workerAgentId: "pi-coder",
+      orderText: "修复并提 PR",
+    });
+    engine.reportVerdict({
+      taskId: task.id,
+      agentId: "pi-coder",
+      state: "ready",
+      summary: "已提交 PR #202",
+      prNumber: 202,
+    });
+    const workerSession = store.getSessionByPair("pi-coder", task.id)!;
+    assert.equal(workerSession.activeRunId, null, "Worker exited after Run 1");
+
+    // 3. Hours later, GitHub CI fails on PR #202 -> automatically wakes pi-coder Session!
+    const ciWebhook = ingestGitHubWebhook(engine, {
+      deliveryId: "deliv-ci-202",
+      event: "check_suite",
+      sender: "github-actions",
+      prNumber: 202,
+      checkConclusion: "failure",
+      body: "TestCookieRace failed",
+    });
+    assert.equal(ciWebhook.status, "fanned_out");
+    const wokenSession = store.getSession(workerSession.id)!;
+    assert.notEqual(wokenSession.activeRunId, null, "CI failure webhook automatically resumed Worker session");
+
+    // 4. Simulate Run lease expiration & Sweeper self-healing + Fencing stale executor
+    const stalledRun = store.getRun(wokenSession.activeRunId!)!;
+    const staleLeaseToken = stalledRun.leaseToken;
+    stalledRun.leaseExpiresAt = "2020-01-01T00:00:00.000Z";
+    store.saveRun(stalledRun);
+
+    const reclaimedRuns = engine.sweepStaleRuns("2026-01-01T00:00:00.000Z");
+    assert.equal(reclaimedRuns.length, 1);
+    assert.notEqual(reclaimedRuns[0].leaseToken, staleLeaseToken, "New recovery Run rotates leaseToken");
+
+    // Old zombie executor tries to report with expired leaseToken -> fenced!
+    assert.throws(
+      () =>
+        engine.reportVerdict({
+          taskId: task.id,
+          agentId: "pi-coder",
+          state: "ready",
+          summary: "Zombie report",
+          leaseToken: staleLeaseToken,
+        }),
+      /Fenced stale executor/
     );
   });
 

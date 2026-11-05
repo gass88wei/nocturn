@@ -2242,6 +2242,28 @@
               newReceipt.receiptLabel = "✓✓ 模型已读入上下文 (read)";
               syncUI();
             }, 1000);
+
+            // 如果连接了本地 Nocturn Server (/api/sota/exec)，同时在远端 sota Pi 1.5.0 真实执行该轮插话并回显结果
+            if (location.protocol.startsWith("http")) {
+              fetch("/api/sota/exec", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ taskId: ws.taskCode, agentId: found.agent.id, prompt: val })
+              })
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                  if (data && data.sotaReply) {
+                    newReceipt.receiptState = "read";
+                    newReceipt.receiptLabel = "✓✓ sota Pi 1.5.0 已读";
+                    ws.steps.push({
+                      badge: "步骤",
+                      text: `[sota Pi 1.5.0 真实回复 (${data.piSessionId.slice(0, 8)})] ${data.sotaReply}`
+                    });
+                    syncUI();
+                  }
+                })
+                .catch(() => {});
+            }
           }
         }
       } else if (drawerState.mode === "leader") {

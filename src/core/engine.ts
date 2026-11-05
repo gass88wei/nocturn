@@ -105,7 +105,9 @@ export class NocturnEngine {
         }
       }
 
-      const now = new Date().toISOString();
+      const nowMs = Date.now();
+      const now = new Date(nowMs).toISOString();
+      const leaseExpiresAt = new Date(nowMs + 5 * 60 * 1000).toISOString();
       const run: AgentRun = {
         id: uid("run"),
         sessionId: session.id,
@@ -113,12 +115,14 @@ export class NocturnEngine {
         agentId: session.agentId,
         isLeaderTurn,
         status: "running",
+        leaseToken: uid("lease"),
+        leaseExpiresAt,
         summary,
         steps: [
           {
             badge: "步骤",
             text: session.piSessionId
-              ? `[恢复会话] --resume ${session.piSessionId} (${session.worktreePath})`
+              ? `[恢复会话] --session-id ${session.piSessionId} (${session.worktreePath})`
               : `[新建会话] 初始化工作区 ${session.worktreePath}`,
             timestamp: now,
           },
@@ -217,10 +221,21 @@ export class NocturnEngine {
     humanActionOptions?: string[];
     prNumber?: number | null;
     confidence?: number;
+    leaseToken?: string;
   }): Task {
     return this.store.atomic(() => {
       const task = this.store.getTask(params.taskId);
       if (!task) throw new Error(`Task not found: ${params.taskId}`);
+
+      const session = this.store.getSessionByPair(params.agentId, task.id);
+      if (params.leaseToken && session?.activeRunId) {
+        const activeRun = this.store.getRun(session.activeRunId);
+        if (activeRun && activeRun.leaseToken !== params.leaseToken) {
+          throw new Error(
+            `Fenced stale executor: leaseToken ${params.leaseToken} does not match active Run lease ${activeRun.leaseToken}`
+          );
+        }
+      }
 
       const now = new Date().toISOString();
       const verdict = {
@@ -258,7 +273,6 @@ export class NocturnEngine {
       }
 
       // Record on active Run and settle turn if terminal state (ready / blocked / failed / dropped)
-      const session = this.store.getSessionByPair(params.agentId, task.id);
       if (session?.activeRunId) {
         const run = this.store.getRun(session.activeRunId);
         if (run) {
@@ -456,16 +470,45 @@ export class NocturnEngine {
   }
 
   /**
-   * 5. Subscription green-channel fan-out & `handback` out-of-scope triggers
+   * Sweeper self-healing: reclaim any running Run whose heartbeat lease has expired,
+   * rotating the leaseToken so a zombie process cannot overwrite state later.
+   */
+  sweepStaleRuns(nowIso = new Date().toISOString()): AgentRun[] {
+    return this.store.atomic(() => {
+      const reclaimed: AgentRun[] = [];
+      for (const run of this.store.listAllRuns()) {
+        if (run.status === "running" && run.leaseExpiresAt < nowIso) {
+          const recoveryRun = this.interruptAndRecoverSession(
+            run.sessionId,
+            `Sweeper 检测到心跳租约超时 (${run.leaseExpiresAt})，自动接管并恢复会话`
+          );
+          reclaimed.push(recoveryRun);
+        }
+      }
+      return reclaimed;
+    });
+  }
+
+  /**
+   * 5. Subscription green-channel fan-out & `handback` out-of-scope triggers (with idempotency dedup)
    */
   receiveExternalTrigger(params: {
+    eventKey?: string;
     threadKey: string;
     actor: string;
     text: string;
-  }): { trigger: ExternalTrigger; routedToTaskIds: string[] } {
+  }): { trigger: ExternalTrigger; duplicate: boolean; routedToTaskIds: string[] } {
     return this.store.atomic(() => {
+      const eventKey =
+        params.eventKey ?? `${params.threadKey}:${params.actor}:${params.text}`;
+      const existing = this.store.getTriggerByEventKey(eventKey);
+      if (existing) {
+        return { trigger: existing, duplicate: true, routedToTaskIds: [] };
+      }
+
       const trigger: ExternalTrigger = {
         id: uid("trig"),
+        eventKey,
         threadKey: params.threadKey,
         actor: params.actor,
         text: params.text,
@@ -491,7 +534,7 @@ export class NocturnEngine {
         routedToTaskIds.push(t.id);
       }
 
-      return { trigger, routedToTaskIds };
+      return { trigger, duplicate: false, routedToTaskIds };
     });
   }
 
