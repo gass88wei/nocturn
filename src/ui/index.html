@@ -913,6 +913,30 @@
     // 只保留你真正跑过的 2 个真实任务作为离线兜底（彻底删除所有假 Mock 任务！）
     let tasksData = [
       {
+        id: "task_451",
+        identifier: "TASK-451",
+        boundIssue: "nocturn#451",
+        title: "#451 画一个svg，自行车骑鹈鹕",
+        squadId: "dev",
+        status: "done",
+        leaderAgentId: "dev-leader",
+        assignedWorkerId: "codex-reviewer",
+        svgUrl: "/api/bicycle-pelican.svg",
+        latestVerdict: {
+          state: "ready",
+          risk: "low",
+          summary: "审查通过 (Auto-Done)：bicycle-riding-pelican.svg 拟人化红色自行车（带笑脸与小黄旗）骑在奔跑的鹈鹕背上；xml.dom.minidom 解析通过（120个元素）且 cairosvg 渲染视觉核验无误。"
+        },
+        leaderNote: "pi-coder 13步一次成稿（无死循环） -> 队长自动转交 @codex-reviewer 渲染核验通过 -> 自动结单。",
+        steps: [
+          { badge: "步骤", text: "1. dev-leader (gemini-4-argon-high) 派单 -> @pi-coder" },
+          { badge: "步骤", text: "2. pi-coder (deepseek-v4.1-flash) 编写 bicycle-riding-pelican.svg (9,580B) & XML校验通过" },
+          { badge: "步骤", text: "3. 恢复 dev-leader 原会话 (feef7bda) -> 自动转派给 @codex-reviewer" },
+          { badge: "步骤", text: "4. codex-reviewer (zgca/deepseek-flash) 渲染 PNG 并用 read 肉眼审查构图通过" },
+          { badge: "Report", text: "✅ 自动验收结单 (Auto-Done)：status=done (risk=low)" }
+        ]
+      },
+      {
         id: "task_450",
         identifier: "TASK-450",
         boundIssue: "nocturn#450",
@@ -1006,7 +1030,7 @@
     let centerTab = "now"; // 'now' | 'issues'
     let drawerViewMode = "task"; // 'task' | 'leader' | 'worker'
     let issueFilter = "all";
-    let selectedTaskId = "task_450";
+    let selectedTaskId = "task_451";
     let selectedActorId = null;
     let selectedSquadId = null;
     let hoveredActorId = null;
@@ -1282,9 +1306,10 @@
         <div class="prop-pill" style="margin-left:auto;color:#dc2626;" onclick="deleteTask('${t.id}', '${t.identifier}', event)">删除</div>
       `;
 
-      const svgPreviewHtml = (t.identifier === "TASK-445" || t.hasSvgPreview) ? `
+      const svgUrl = t.svgUrl || (t.identifier === "TASK-451" ? "/api/bicycle-pelican.svg" : (t.identifier === "TASK-445" || t.hasSvgPreview ? "/api/pelican.svg" : null));
+      const svgPreviewHtml = svgUrl ? `
         <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#f8fafc;">
-          <img src="${API_BASE}/api/pelican.svg" style="width:100%;max-height:150px;object-fit:contain;display:block;" alt="SVG Preview" onerror="this.parentElement.style.display='none'"/>
+          <img src="${API_BASE}${svgUrl}" style="width:100%;max-height:165px;object-fit:contain;display:block;" alt="SVG Preview" onerror="this.parentElement.style.display='none'"/>
         </div>
       ` : "";
 

@@ -180,6 +180,18 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
         }
       }
 
+      if (req.method === "GET" && url.pathname === "/api/bicycle-pelican.svg") {
+        const svgPath = join(__dirname, "../../bicycle-riding-pelican.svg");
+        if (existsSync(svgPath)) {
+          res.writeHead(200, {
+            "Content-Type": "image/svg+xml; charset=utf-8",
+            "Access-Control-Allow-Origin": "*",
+          });
+          res.end(readFileSync(svgPath, "utf8"));
+          return;
+        }
+      }
+
       if (req.method === "POST" && url.pathname === "/api/agents") {
         const body = await readJsonBody(req);
         const agent = engine.upsertAgent({
