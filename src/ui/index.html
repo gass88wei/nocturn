@@ -1285,6 +1285,30 @@
             dotType: "blue",
             workerSessions: [
               {
+                taskId: "p438",
+                taskCode: "TASK-438",
+                taskTitle: "#438 编写 calc.js 斐波那契与四则运算模块并通过单测",
+                elapsed: "00:26",
+                active: false,
+                subscriptions: ["Issue #438"],
+                verdict: {
+                  state: "ready",
+                  label: "准出裁定 Verdict：ready (sota 真机交付 · 23/23 单测通过)",
+                  summary: "已实现 calc.js（add/multiply/fib，含参数校验：非数字抛 TypeError、fib 负数抛 RangeError、迭代 O(n)/O(1) 实现）与零依赖测试 calc.test.js（node:assert）。执行 node calc.test.js：通过 23 / 失败 0，退出码 0，全部断言通过。"
+                },
+                attention: null,
+                currentThought: "已在 sota 的 /root/code/worktrees/task-438-pi-coder 目录完成 calc.js 与 calc.test.js 编写，23 项断言全部通过并已调用 nocturn report 交付！",
+                runSummary: "已完成 · node calc.test.js (23/23 通过)",
+                steps: [
+                  { badge: "步骤", text: "[新建会话] 初始化工作区 /root/code/worktrees/task-438-pi-coder" },
+                  { badge: "步骤", text: "[模型路由] pi-coder 使用模型 Deepseek-V4.1-Flash/deepseek-v4.1-flash" },
+                  { badge: "步骤", text: "[sota 工具调用 · write] /root/code/worktrees/task-438-pi-coder/calc.js (1093 bytes)" },
+                  { badge: "步骤", text: "[sota 工具调用 · write] /root/code/worktrees/task-438-pi-coder/calc.test.js (3118 bytes)" },
+                  { badge: "步骤", text: "[sota 工具调用 · bash] cd /root/code/worktrees/task-438-pi-coder && node calc.test.js -> 通过: 23 失败: 0 全部断言通过 ✅" },
+                  { badge: "report", text: "[结构化上报] nocturn report --task TASK-438 --agent pi-coder --state ready --summary '已实现 calc.js 与 calc.test.js，通过 23 / 失败 0'" }
+                ]
+              },
+              {
                 taskId: "p2",
                 taskCode: "TASK-427",
                 taskTitle: "#427 仓库页预览与二部图重构",
@@ -1439,6 +1463,20 @@
     ];
 
     const pills = [
+      {
+        id: "p438",
+        squadId: "dev",
+        identifier: "TASK-438",
+        status: "待审核",
+        dotType: "in_review",
+        title: "#438 编写 calc.js 斐波那契与四则运算模块并通过单测",
+        badgeText: "🎉 真机交付 (23/23)",
+        badgeClass: "ready",
+        links: [
+          { actorId: "dev-leader", type: "waiting" },
+          { actorId: "pi-coder", type: "running" }
+        ]
+      },
       {
         id: "p1",
         squadId: "dev",
