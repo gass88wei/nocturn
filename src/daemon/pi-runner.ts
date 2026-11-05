@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { NocturnEngine } from "../core/engine.ts";
 import { buildLeaderBriefing, buildWorkerBriefing } from "../core/briefing.ts";
 
+export const SOTA_BASE_DIR = "/home/qijinyin/multimodal/yangxin/nocturn";
 export const LEADER_MODEL = "Deepseek-V4.1-Flash/gemini-4-argon-high";
 export const WORKER_MODELS = [
   "Deepseek-V4.1-Flash/deepseek-v4.1-flash",
@@ -73,7 +74,8 @@ export class SotaPiRunner {
   }): { bin: string; args: string[]; model: string } {
     const model = params.model ?? LEADER_MODEL;
     const escapedPrompt = params.prompt.replace(/'/g, `'\\''`);
-    const remoteCmd = `mkdir -p ${params.worktreePath} && cd ${params.worktreePath} && /usr/local/bin/pi --mode json --model ${model} --session-id ${params.piSessionId} -p '${escapedPrompt}'`;
+    const envExport = `export HOME=${SOTA_BASE_DIR} PI_CODING_AGENT_DIR=${SOTA_BASE_DIR}/.pi/agent TMPDIR=${SOTA_BASE_DIR}/tmp PATH=${SOTA_BASE_DIR}/bin:$PATH`;
+    const remoteCmd = `${envExport} && mkdir -p ${params.worktreePath} ${SOTA_BASE_DIR}/sessions ${SOTA_BASE_DIR}/tmp && cd ${params.worktreePath} && ${SOTA_BASE_DIR}/bin/pi --mode json --session-dir ${SOTA_BASE_DIR}/sessions --model ${model} --session-id ${params.piSessionId} -p '${escapedPrompt}'`;
 
     return {
       bin: "ssh",
