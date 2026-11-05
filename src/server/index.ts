@@ -384,16 +384,30 @@ print(json.dumps({"worktreePath": wdir, "files": out}))
         const session = engine.ensureSession(agentId, task.id);
         await runner.processPendingEffects();
 
-        const promptText = body.prompt
-          ? String(body.prompt)
-          : runner.buildBriefingForTaskAgent(task.id, agentId);
+        const userInstruction = body.prompt ? String(body.prompt).trim() : "";
+        let promptText: string;
+        if (userInstruction) {
+          if (agentId === "dev-leader" || agentId === "ops-leader") {
+            promptText = `人类指挥官对任务 ${task.identifier} 下达了新的调度指令：「${userInstruction}」。请立即根据该指令调用 nocturn dispatch --task ${task.identifier} --to <目标组员ID> --order "<更新后的执行要求>" 重新派单并结束回合！`;
+          } else if (agentId === "codex-reviewer") {
+            promptText = `人类指挥官要求你对任务 ${task.identifier} 重新执行审查：「${userInstruction}」。请检查当前目录文件并验证后，调用 nocturn report --task ${task.identifier} --agent codex-reviewer --state ready --risk low --summary "<最新审查结论>"（若发现缺陷需打回重做则传 --state rework）。`;
+          } else {
+            // Worker (pi-coder / bench-worker): redo implementation and trigger downstream Reviewer relay!
+            task.status = "in_progress";
+            task.assignedWorkerId = agentId;
+            store.saveTask(task);
+            promptText = `人类指挥官对你在任务 ${task.identifier} 的实现提出了修改/重做要求：「${userInstruction}」。请立即在当前工作区修改文件并验证通过后，必须调用 nocturn report --task ${task.identifier} --agent ${agentId} --state ready --risk low --summary "<修改完成摘要>" 交付（以便系统自动触发后续队长转审与 Reviewer 复审）！严禁反复截图微调超过 1 次。`;
+          }
+        } else {
+          promptText = runner.buildBriefingForTaskAgent(task.id, agentId);
+        }
 
         engine.sendInput({
           taskId: task.id,
           targetAgentId: agentId,
           author: "yangxin",
           mode: "steer",
-          text: String(body.prompt ?? "执行当前任务回合"),
+          text: userInstruction || "重新执行当前棒次回合",
         });
         await runner.processPendingEffects();
 

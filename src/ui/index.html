@@ -656,11 +656,11 @@
         <section class="deliverables-card" id="deliverablesCard"></section>
       </div>
 
-      <!-- 3. 右侧伴随式 Session 抽屉：展示你在中间连线图里点中的那一棒 Session 详情，并直接向它插话介入 -->
+      <!-- 3. 右侧伴随式 Session 抽屉：展示你在中间连线图里点中的那一棒 Session 详情，并支持从任意一棒定向重做！ -->
       <aside class="session-peek-drawer">
         <div class="drawer-header">
           <span style="font-size:12px;font-weight:700;color:#1e1b4b;" id="drawerHeaderTitle">⚡ Session 详情</span>
-          <button class="pill-btn" style="color:#1d4ed8;border-color:#93c5fd;background:#eff6ff;" onclick="triggerLiveSotaTurn()">🚀 sota 真跑一轮</button>
+          <button class="pill-btn" style="color:#b45309;border-color:#fcd34d;background:#fffbeb;" onclick="promptRedoSelectedStage()" title="直接唤醒这一棒的原生 Session 重新执行，并自动触发其下游接力">↻ 从这一棒重做</button>
         </div>
 
         <!-- 切换本 Issue 内的第 1..4 棒 Session -->
@@ -1175,16 +1175,25 @@
       `).join("");
 
       const cleanSteps = (curRun.steps || []).filter(s => !String(s).startsWith("[sota Pi 1.5.0 回复] I'll start by inspecting"));
+      const cascadeHint = curRun.agentId === "pi-coder"
+        ? "重做此棒将恢复 pi-coder 原会话改代码 → 完成后自动唤醒队长转交 → Reviewer 自动复审结单"
+        : curRun.agentId === "codex-reviewer"
+        ? "重做此棒仅唤醒 codex-reviewer 重新独立审查，无需 pi-coder 重写代码"
+        : "重做此棒将唤醒队长重新拆单并触发下游组员执行";
 
       document.getElementById("drawerScroll").innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:7px;">
             <div class="actor-avatar" style="background:${agentInfo.color}">${agentInfo.initials}</div>
             <div>
-              <div style="font-size:13px;font-weight:700;color:#111827;">${agentInfo.name}</div>
+              <div style="font-size:13px;font-weight:700;color:#111827;">${agentInfo.name} · 绑定会话 (${t.identifier})</div>
               <div style="font-size:10.5px;color:#64748b;">模型：${agentInfo.model} · 隔离目录：worktrees/${t.identifier.toLowerCase()}</div>
             </div>
           </div>
+        </div>
+
+        <div style="font-size:11px;color:#4338ca;background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:7px 10px;">
+          <strong>🔗 阶段重做联动规则：</strong>${cascadeHint}
         </div>
 
         <div class="verdict-box">${curRun.fullReport || curRun.shortSummary || '正在 sota 上执行当前回合...'}</div>
@@ -1199,6 +1208,27 @@
           </div>
         </div>
       `;
+    }
+
+    // 从当前选中的这一棒直接重做（定向唤醒该角色的原生 Session，并自动串联后续棒次）
+    function promptRedoSelectedStage() {
+      const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
+      if (!t) return;
+      const runs = t.runs || [];
+      const curRun = runs[selectedRunIdx] || runs[runs.length - 1] || { agentId: "pi-coder", stageLabel: "当前阶段" };
+      const defaultPrompt = curRun.agentId === "pi-coder"
+        ? "在当前代码基础上再补充一个边界测试并重新运行验证"
+        : curRun.agentId === "codex-reviewer"
+        ? "请重新严格复跑一次测试并给出审查结论"
+        : "请重新将此任务委派给 pi-coder 执行";
+
+      const instruction = prompt(
+        `【从 ${curRun.stageLabel} (${curRun.agentId}) 重做】\n请输入给 @${curRun.agentId} 的重做/修改指令（将在 sota 上恢复其原生 Session 执行，并自动触发下游接力）：`,
+        defaultPrompt
+      );
+      if (!instruction) return;
+      document.getElementById("composerInput").value = instruction;
+      document.getElementById("sendCommentBtn").click();
     }
 
     function openCreateModal() {
