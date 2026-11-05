@@ -5,6 +5,7 @@ import { NocturnEngine } from "../src/core/engine.ts";
 import { SotaPiRunner } from "../src/daemon/pi-runner.ts";
 import { executeAgentCliCommand } from "../src/tools/nocturn-cli.ts";
 import { ingestGitHubWebhook } from "../src/sources/github.ts";
+import { buildLeaderBriefing, buildWorkerBriefing } from "../src/core/briefing.ts";
 
 function setupSeededEngine() {
   const store = new NocturnStore(":memory:");
@@ -281,5 +282,65 @@ describe("Nocturn Core Engine & Distilled Mechanisms", () => {
     assert.equal(newTask.status, "dispatching");
     const savedTrigger = store.getTrigger(trigger.id)!;
     assert.equal(savedTrigger.handedBackByTaskId, task.id);
+  });
+
+  it("Fan-out & Join Gate + BriefingBuilder + Leader Auto-Wakeup: wakes parent Leader only when ALL parallel subtasks report Verdict=ready", async () => {
+    const { store, engine, runner } = setupSeededEngine();
+
+    // Register a second worker via upsertAgent
+    engine.upsertAgent({
+      id: "codex-reviewer",
+      name: "codex-reviewer",
+      squadId: "dev",
+      role: "worker",
+      cli: "pi",
+      model: "deepseek-v4.1-flash",
+      skills: ["review"],
+      instructions: "负责测试与代码审查",
+    });
+
+    const parent = engine.createTask({
+      identifier: "TASK-500",
+      title: "全栈重构（前后端并行）",
+      squadId: "dev",
+    });
+
+    // Leader splits parent into 2 parallel subtasks via `nocturn fanout`
+    const children = executeAgentCliCommand(engine, "fanout", {
+      parent: parent.id,
+      subtasks: [
+        { id: "TASK-500-FE", title: "前端二部图改造", to: "pi-coder", order: "改前端" },
+        { id: "TASK-500-BE", title: "后端 SQLite 接口", to: "codex-reviewer", order: "改后端" },
+      ],
+    }) as Array<{ id: string; identifier: string }>;
+    assert.equal(children.length, 2);
+
+    // Subtask 1 reports ready -> Parent must still be in_progress (Join Gate waiting for Subtask 2)
+    engine.reportVerdict({
+      taskId: children[0].id,
+      agentId: "pi-coder",
+      state: "ready",
+      summary: "前端完成",
+    });
+    assert.equal(store.getTask(parent.id)!.status, "in_progress");
+
+    // Subtask 2 reports ready -> Join Gate satisfied! Parent advances to in_review & wakes Leader!
+    engine.reportVerdict({
+      taskId: children[1].id,
+      agentId: "codex-reviewer",
+      state: "ready",
+      summary: "后端完成",
+    });
+    assert.equal(store.getTask(parent.id)!.status, "in_review");
+
+    await runner.processPendingEffects();
+    const leaderRuns = store.listAllRuns().filter((r) => r.taskId === parent.id && r.agentId === "dev-leader");
+    assert.equal(leaderRuns.length, 2, "Leader automatically woken for Join Gate synthesis Run");
+
+    // Verify BriefingBuilder generates role-aware Leader & Worker prompts
+    const leaderPrompt = runner.buildBriefingForTaskAgent(parent.id, "dev-leader", "Join Gate 汇总");
+    assert.ok(leaderPrompt.includes("TASK-500-FE") && leaderPrompt.includes("TASK-500-BE"));
+    const workerPrompt = runner.buildBriefingForTaskAgent(children[0].id, "pi-coder");
+    assert.ok(workerPrompt.includes("nocturn report"));
   });
 });

@@ -1,20 +1,22 @@
 #!/usr/bin/env node
 /**
- * Nocturn 4 Core Agent Primitives CLI
+ * Nocturn Core Agent Primitives CLI
  *
- * Replaces dozens of bloated CRUD commands with 4 orthogonal orchestration primitives:
  * 1. `nocturn report`   — Worker reports structured Verdict (progress/ready/blocked/failed) + optional human_action + PR binding
  * 2. `nocturn handback` — Worker returns an out-of-scope message back to Squad Leader for re-routing
  * 3. `nocturn dispatch` — Squad Leader delegates a Task to a Worker and immediately exits its pulse turn
- * 4. `nocturn note`     — Squad Leader sends a context-only note to a running Worker Session
+ * 4. `nocturn fanout`   — Squad Leader splits a parent Task into parallel subtasks with an AND Join Gate
+ * 5. `nocturn note`     — Squad Leader sends a context-only note to a running Worker Session
  */
 import type { NocturnEngine } from "../core/engine.ts";
 import type { VerdictState } from "../core/model.ts";
 
+export type NocturnCliCommand = "report" | "handback" | "dispatch" | "fanout" | "note";
+
 export function executeAgentCliCommand(
   engine: NocturnEngine,
-  command: "report" | "handback" | "dispatch" | "note",
-  args: Record<string, string | number | undefined>
+  command: NocturnCliCommand,
+  args: Record<string, unknown>
 ): unknown {
   switch (command) {
     case "report": {
@@ -53,6 +55,32 @@ export function executeAgentCliCommand(
         taskId: String(args.task ?? ""),
         workerAgentId: String(args.to ?? ""),
         orderText: String(args.order ?? ""),
+      });
+    }
+
+    case "fanout": {
+      const rawSubtasks =
+        typeof args.subtasks === "string"
+          ? (JSON.parse(args.subtasks) as Array<{
+              id: string;
+              title: string;
+              to: string;
+              order?: string;
+            }>)
+          : (args.subtasks as Array<{
+              id: string;
+              title: string;
+              to: string;
+              order?: string;
+            }>);
+      return engine.fanoutSubtasks({
+        parentTaskId: String(args.parent ?? args.task ?? ""),
+        subtasks: (rawSubtasks ?? []).map((s) => ({
+          identifier: s.id,
+          title: s.title,
+          workerAgentId: s.to,
+          orderText: s.order ?? s.title,
+        })),
       });
     }
 

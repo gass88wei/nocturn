@@ -1,9 +1,11 @@
 import type {
+  Agent,
   AgentRun,
   AgentSession,
   AttentionRequest,
   ExternalTrigger,
   InputDeliveryMode,
+  RunTraceStep,
   Task,
   TaskInput,
   VerdictState,
@@ -21,9 +23,47 @@ function uid(prefix: string): string {
  */
 export class NocturnEngine {
   readonly store: NocturnStore;
+  private listeners: Array<() => void> = [];
 
   constructor(store: NocturnStore) {
     this.store = store;
+  }
+
+  onStateChange(listener: () => void): () => void {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== listener);
+    };
+  }
+
+  notifyChange(): void {
+    this.store.afterCommit(() => {
+      for (const l of this.listeners) {
+        try {
+          l();
+        } catch {
+          // ignore listener error
+        }
+      }
+    });
+  }
+
+  /**
+   * Create or update a persistent Agent in the registry (and attach to Squad if needed).
+   */
+  upsertAgent(agent: Agent): Agent {
+    return this.store.atomic(() => {
+      this.store.saveAgent(agent);
+      if (agent.squadId) {
+        const squad = this.store.listSquads().find((s) => s.id === agent.squadId);
+        if (squad && !squad.memberIds.includes(agent.id)) {
+          squad.memberIds.push(agent.id);
+          this.store.saveSquad(squad);
+        }
+      }
+      this.notifyChange();
+      return agent;
+    });
   }
 
   /**
@@ -62,7 +102,72 @@ export class NocturnEngine {
       // Ensure Leader has a Session for this Task and schedule a pulse dispatch Run
       const leaderSession = this.ensureSession(squad.leaderId, task.id);
       this.startRun(leaderSession.id, true, `评估并派发任务 ${task.identifier}`);
+      this.notifyChange();
       return task;
+    });
+  }
+
+  /**
+   * Fan-out parallel child tasks under a parent Task and immediately exit the Leader's pulse Run.
+   * When all child tasks report Verdict=ready, the Join Gate automatically wakes the Leader on the parent Task.
+   */
+  fanoutSubtasks(params: {
+    parentTaskId: string;
+    subtasks: Array<{ identifier: string; title: string; workerAgentId: string; orderText: string }>;
+  }): Task[] {
+    return this.store.atomic(() => {
+      const parent = this.store.getTask(params.parentTaskId);
+      if (!parent) throw new Error(`Parent task not found: ${params.parentTaskId}`);
+
+      const now = new Date().toISOString();
+      parent.status = "in_progress";
+      parent.updatedAt = now;
+      this.store.saveTask(parent);
+
+      // End Leader's active pulse Run on the parent task immediately ("Stop after fan-out")
+      const leaderSession = this.store.getSessionByPair(parent.leaderAgentId, parent.id);
+      if (leaderSession?.activeRunId) {
+        const leaderRun = this.store.getRun(leaderSession.activeRunId);
+        if (leaderRun && leaderRun.status === "running") {
+          leaderRun.steps.push({
+            badge: "步骤",
+            text: `[Fan-out 并行拆单] 已拆分为 ${params.subtasks.length} 个并行子任务，挂接 Join Gate 等待全部完成自动唤醒`,
+            timestamp: now,
+          });
+          leaderRun.status = "completed";
+          leaderRun.endedAt = now;
+          leaderSession.activeRunId = null;
+          this.store.saveRun(leaderRun);
+          this.store.saveSession(leaderSession);
+        }
+      }
+
+      const createdChildren: Task[] = [];
+      for (const item of params.subtasks) {
+        const child: Task = {
+          id: uid("task"),
+          identifier: item.identifier,
+          title: item.title,
+          description: item.orderText,
+          squadId: parent.squadId,
+          status: "in_progress",
+          leaderAgentId: parent.leaderAgentId,
+          assignedWorkerId: item.workerAgentId,
+          parentTaskId: parent.id,
+          subscribedThreads: [`github:issue:${item.identifier}`],
+          latestVerdict: null,
+          pendingAttention: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        this.store.saveTask(child);
+        const workerSession = this.ensureSession(item.workerAgentId, child.id);
+        this.startRun(workerSession.id, false, `执行并行子任务：${item.orderText}`);
+        createdChildren.push(child);
+      }
+
+      this.notifyChange();
+      return createdChildren;
     });
   }
 
@@ -205,7 +310,50 @@ export class NocturnEngine {
         false,
         `执行队长委派：${params.orderText}`
       );
+      this.notifyChange();
       return { task, workerRun };
+    });
+  }
+
+  /**
+   * Append a live streaming trace step to an active Run (used by SotaPiRunner JSON stream).
+   */
+  appendRunStep(runId: string, step: Omit<RunTraceStep, "timestamp">, newSummary?: string): void {
+    this.store.atomic(() => {
+      const run = this.store.getRun(runId);
+      if (!run) return;
+      run.steps.push({ ...step, timestamp: new Date().toISOString() });
+      if (newSummary) run.summary = newSummary;
+      this.store.saveRun(run);
+      this.notifyChange();
+    });
+  }
+
+  /**
+   * Explicitly stop an active Run (when user clicks "■ 停止").
+   */
+  stopRun(runId: string, reason = "用户手动点击停止"): AgentRun | undefined {
+    return this.store.atomic(() => {
+      const run = this.store.getRun(runId);
+      if (!run) return undefined;
+      const now = new Date().toISOString();
+      run.status = "interrupted";
+      run.endedAt = now;
+      run.steps.push({
+        badge: "步骤",
+        text: `[已停止] ${reason}`,
+        timestamp: now,
+      });
+      this.store.saveRun(run);
+
+      const session = this.store.getSession(run.sessionId);
+      if (session && session.activeRunId === run.id) {
+        session.activeRunId = null;
+        session.updatedAt = now;
+        this.store.saveSession(session);
+      }
+      this.notifyChange();
+      return run;
     });
   }
 
@@ -300,22 +448,52 @@ export class NocturnEngine {
       // Advance Task status & trigger Squad Leader Join Gate wakeup on ready / blocked
       if (params.state === "ready") {
         task.status = "in_review";
-        this.store.enqueueEffect("wake_leader", `wake:${task.id}:ready`, {
+        this.store.enqueueEffect("wake_leader", `wake:${task.id}:ready:${now}`, {
           taskId: task.id,
           leaderAgentId: task.leaderAgentId,
-          reason: `Worker ${params.agentId} reported Verdict=ready: ${params.summary}`,
+          reason: `组员 ${params.agentId} 提交结构化 Verdict=ready: ${params.summary}`,
         });
+
+        // If this Task is a child subtask (`parentTaskId`), check the AND Join Gate across all siblings!
+        if (task.parentTaskId) {
+          const siblings = this.store
+            .listTasks()
+            .filter((t) => t.parentTaskId === task.parentTaskId);
+          const allReady = siblings.every(
+            (s) =>
+              (s.id === task.id ? "in_review" : s.status) === "in_review" ||
+              s.status === "done"
+          );
+          if (allReady) {
+            const parentTask = this.store.getTask(task.parentTaskId);
+            if (parentTask) {
+              parentTask.status = "in_review";
+              parentTask.updatedAt = now;
+              this.store.saveTask(parentTask);
+              this.store.enqueueEffect(
+                "wake_leader",
+                `wake:join:${parentTask.id}:${now}`,
+                {
+                  taskId: parentTask.id,
+                  leaderAgentId: parentTask.leaderAgentId,
+                  reason: `[Join Gate 汇聚完成] 父任务 ${parentTask.identifier} 下属的全部 ${siblings.length} 个并行子任务均已上报 Verdict=ready，自动唤醒队长汇总验收！`,
+                }
+              );
+            }
+          }
+        }
       } else if (params.state === "blocked") {
         task.status = "blocked";
-        this.store.enqueueEffect("wake_leader", `wake:${task.id}:blocked`, {
+        this.store.enqueueEffect("wake_leader", `wake:${task.id}:blocked:${now}`, {
           taskId: task.id,
           leaderAgentId: task.leaderAgentId,
-          reason: `Worker ${params.agentId} reported Verdict=blocked: ${params.summary}`,
+          reason: `组员 ${params.agentId} 提交结构化 Verdict=blocked: ${params.summary}`,
         });
       }
 
       task.updatedAt = now;
       this.store.saveTask(task);
+      this.notifyChange();
       return task;
     });
   }
@@ -395,6 +573,7 @@ export class NocturnEngine {
       }
 
       this.store.saveInput(input);
+      this.notifyChange();
       return input;
     });
   }

@@ -1034,7 +1034,10 @@
         </div>
       </div>
 
-      <div class="group-title"><span>长期智能体 (sota · Pi 1.5.0)</span><span>5</span></div>
+      <div class="group-title">
+        <span>长期智能体 (sota · Pi 1.5.0)</span>
+        <span style="cursor:pointer;color:#4f46e5;" onclick="promptAddAgent()" title="新增长期智能体">+ 新增</span>
+      </div>
       <div class="nav-list">
         <div class="nav-row" data-left-key="actor:dev-leader" onclick="selectSquadLeader('dev')">
           <div class="member-avatar-wrap">
@@ -1154,7 +1157,10 @@
       <aside class="issue-peek-panel" id="issuePeekPanel">
         <div class="peek-header">
           <span class="peek-mode-badge worker" id="peekModeBadge">⚡ pi-coder · 个人实时终端 Session</span>
-          <span style="font-size:10.5px;color:#8f959e" id="peekHeaderSub">SQLite 事务 + sota Pi 1.5.0</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button class="pill-btn" style="padding:2px 8px;font-size:10.5px;border-color:#93c5fd;color:#1d4ed8;background:#eff6ff;" onclick="triggerLiveSotaTurn()" title="在远端 sota 服务器上真实调用 Pi 1.5.0 执行当前 Session">🚀 sota 真跑一轮</button>
+            <span style="font-size:10.5px;color:#8f959e" id="peekHeaderSub">SQLite + SSE 实时</span>
+          </div>
         </div>
 
         <div class="peek-props-bar" id="peekPropsBar"></div>
@@ -1882,7 +1888,7 @@
                 <span class="spinner-dot" style="background:${activeSess.active ? '#2563eb' : '#10b981'}"></span>
                 <span class="inline-run-agent">${agent.name} · 原生 Session</span>
                 <span class="inline-run-summary">${activeSess.runSummary}</span>
-                ${activeSess.active ? `<button class="inline-run-stop" onclick="alert('已向 sota Daemon 发送停止信号')">■ 停止</button>` : ""}
+                ${activeSess.active ? `<button class="inline-run-stop" onclick="stopActiveSotaRun('${activeSess.runId || ''}', '${activeSess.taskCode}')">■ 停止</button>` : ""}
               </div>
               <div class="inline-run-steps" style="display:flex;">
                 ${stepsHtml}
@@ -2016,7 +2022,123 @@
       if (!p) return;
       p.status = p.status === "进行中" ? "待审核" : (p.status === "待审核" ? "已完成" : "进行中");
       p.dotType = p.status === "待审核" ? "in_review" : "running";
+      if (location.protocol.startsWith("http")) {
+        const apiStatus = p.status === "待审核" ? "in_review" : (p.status === "已完成" ? "done" : "in_progress");
+        fetch("/api/tasks/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId: p.identifier, status: apiStatus })
+        }).catch(() => {});
+      }
       syncUI();
+    }
+
+    // 真实终止远端 sota 上正在运行的 Pi 进程
+    function stopActiveSotaRun(runId, taskCode) {
+      const found = findAgentById(drawerState.workerId);
+      if (found && found.agent.workerSessions[drawerState.workerSessionIdx]) {
+        const ws = found.agent.workerSessions[drawerState.workerSessionIdx];
+        ws.active = false;
+        ws.runSummary = "已终止远端 sota Pi 进程";
+        ws.steps.push({ badge: "步骤", text: "[已停止] 已向 sota 发送 SIGTERM 终止当前运行回合" });
+      }
+      if (location.protocol.startsWith("http") && runId) {
+        fetch("/api/runs/stop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ runId, reason: `用户手动停止 ${taskCode}` })
+        }).catch(() => {});
+      }
+      syncUI();
+    }
+
+    // 新增长期智能体并持久化到 SQLite
+    function promptAddAgent() {
+      const id = prompt("请输入新智能体 ID（如 codex-fixer）：", "codex-fixer");
+      if (!id) return;
+      const name = prompt("请输入显示名称：", id);
+      const skillsStr = prompt("请输入技能标签（逗号分隔）：", "Bug修复, 回归测试");
+      const instructions = prompt("请输入系统职责指令：", "负责快速修复线上回归缺陷并提交 PR。");
+      const skills = (skillsStr || "").split(/[,，]/).map(s => s.trim()).filter(Boolean);
+
+      squads[0].agents.push({
+        id,
+        name: name || id,
+        role: "组员",
+        isLeader: false,
+        sub: "Pi 1.5.0 · 待命",
+        color: "#0284c7",
+        initials: (name || id).slice(0, 2).toUpperCase(),
+        dotType: "blue",
+        workerSessions: [
+          {
+            taskId: "p2",
+            taskCode: "TASK-427",
+            taskTitle: "#427 仓库页预览与二部图重构",
+            elapsed: "00:00",
+            active: false,
+            subscriptions: ["Issue #427"],
+            verdict: { state: "progress", label: "状态：待命", summary: instructions || "新建长期智能体" },
+            attention: null,
+            currentThought: `已注册长期身份（技能：${skills.join("、")}），随时可接收队长委派。`,
+            runSummary: "待命 (sota Pi 1.5.0)",
+            steps: [{ badge: "步骤", text: `[注册成功] 长期智能体 ${id} 已写入 SQLite 注册表` }]
+          }
+        ]
+      });
+
+      if (location.protocol.startsWith("http")) {
+        fetch("/api/agents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, name, squadId: "dev", role: "worker", cli: "pi", skills, instructions })
+        }).catch(() => {});
+      }
+      selectWorker(id, 0);
+    }
+
+    // 一键在远端 sota 上真实跑一轮 Pi 1.5.0 并实时流式回显步骤
+    function triggerLiveSotaTurn() {
+      const targetName = getCurrentTargetName();
+      let taskCode = "TASK-427";
+      let agentId = drawerState.mode === "worker" ? drawerState.workerId : "dev-leader";
+      if (drawerState.mode === "worker") {
+        const found = findAgentById(drawerState.workerId);
+        const ws = found?.agent.workerSessions[drawerState.workerSessionIdx];
+        if (ws) {
+          taskCode = ws.taskCode;
+          ws.steps.push({ badge: "步骤", text: `🚀 [正在连接 sota] 正在拉起远端 Pi 1.5.0 进程执行 ${taskCode}...` });
+          syncUI();
+        }
+      }
+      if (!location.protocol.startsWith("http")) {
+        alert("当前为离线画布预览；访问 http://localhost:4100 点击此按钮将直接通过 SSH 控制套接字在 sota 上拉起真实 Pi 1.5.0 进程！");
+        return;
+      }
+      fetch("/api/sota/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: taskCode,
+          agentId,
+          prompt: `你是 ${targetName}，正在处理任务 ${taskCode}。请用一句话汇报你当前在 sota 工作区 (${taskCode}) 的就绪状态，不要调耗时工具。`
+        })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.sotaReply && drawerState.mode === "worker") {
+            const found = findAgentById(drawerState.workerId);
+            const ws = found?.agent.workerSessions[drawerState.workerSessionIdx];
+            if (ws) {
+              ws.steps.push({
+                badge: "步骤",
+                text: `🟢 [sota Pi 1.5.0 真实执行完成 · 会话 ${data.piSessionId.slice(0, 8)}] ${data.sotaReply}`
+              });
+              syncUI();
+            }
+          }
+        })
+        .catch(() => {});
     }
 
     function syncUI() {
@@ -2309,6 +2431,19 @@
     }
     document.getElementById("collapseSidebarBtn").addEventListener("click", toggleSidebar);
     document.getElementById("toggleSidebarRailBtn").addEventListener("click", toggleSidebar);
+
+    // 如果运行在本地 Nocturn Server (http://localhost:4100)，自动订阅 /api/events SSE 实时流并同步 SQLite 状态
+    if (location.protocol.startsWith("http")) {
+      const es = new EventSource("/api/events");
+      es.onmessage = (ev) => {
+        try {
+          const snap = JSON.parse(ev.data);
+          if (snap && Array.isArray(snap.tasks) && snap.tasks.length > 0) {
+            document.getElementById("peekHeaderSub").textContent = `SQLite 已同步 (${snap.tasks.length} 任务 · SSE 在线)`;
+          }
+        } catch {}
+      };
+    }
 
     window.addEventListener("resize", () => requestAnimationFrame(drawCurves));
     syncUI();
