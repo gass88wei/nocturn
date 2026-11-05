@@ -180,12 +180,14 @@ export class NocturnEngine {
 
     const task = this.store.getTask(taskId);
     const slug = (task?.identifier ?? taskId).toLowerCase();
+    const baseWorkDir =
+      process.env.NOCTURN_SOTA_WORKDIR ?? "/home/qijinyin/multimodal/yangxin/nocturn";
     const session: AgentSession = {
       id: uid("sess"),
       agentId,
       taskId,
       piSessionId: null,
-      worktreePath: `/root/code/worktrees/${slug}-${agentId}`,
+      worktreePath: `${baseWorkDir}/worktrees/${slug}-${agentId}`,
       activeRunId: null,
       updatedAt: new Date().toISOString(),
     };

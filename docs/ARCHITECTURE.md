@@ -14,7 +14,7 @@ Task Lifecycle (长期目标)
                               │               │
                               ▼               └──(reworkTask 定向返工)──┐
 Session Lifecycle ((agentId, taskId) 唯一绑定)                         │
-  worktreePath: /root/code/worktrees/<task>-<agent>                    │
+  worktreePath: /home/qijinyin/multimodal/yangxin/nocturn/worktrees/<task>-<agent> │
   piSessionId:  UUID (对应 sota 上 pi --session-id <uuid>) <───────────┘
         │
         ├── Run #1 (脉冲启动 -> 执行 -> 上报 Verdict -> 退出进程)
