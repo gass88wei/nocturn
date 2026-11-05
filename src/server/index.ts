@@ -198,13 +198,16 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
 
       // Live sota worktree file explorer API: returns files and source code for a Task
       if (req.method === "GET" && url.pathname === "/api/worktree-files") {
-        const taskCode = String(url.searchParams.get("task") ?? "TASK-451").toLowerCase();
+        const taskCode = String(url.searchParams.get("task") ?? "TASK-451")
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]/g, "");
         const pyScript = `
 import os, json, glob
 base = "/home/qijinyin/multimodal/yangxin/nocturn/worktrees"
-dirs = sorted(glob.glob(f"{base}/{taskCode}*"))
+slug = "${taskCode}"
+dirs = sorted(glob.glob(base + "/" + slug + "*"))
 out = []
-wdir = dirs[0] if dirs else f"{base}/{taskCode}"
+wdir = dirs[0] if dirs else (base + "/" + slug)
 for d in dirs:
     for entry in sorted(os.listdir(d)):
         if entry.startswith("."): continue
