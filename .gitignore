@@ -5,6 +5,8 @@
 
 # Pi & Local Agent Artifacts
 .pi/
+*.pdf
+.nocturn.sqlite*
 
 # Environment & Secrets
 .env

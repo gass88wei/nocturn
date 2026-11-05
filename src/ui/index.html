@@ -1,0 +1,2295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nocturn — 提纯融合版（Multica + 知乎 Verdict + SuperAgent 机制）</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg-app: #f6f7f9;
+      --bg-main: #ffffff;
+      --bg-sidebar: #f6f7f9;
+      --bg-hover: #eef0f4;
+      --bg-now-active: #dfe6ff;
+      --bg-pill: #ffffff;
+      --text-primary: #1f2329;
+      --text-secondary: #646a73;
+      --text-muted: #8f959e;
+      --border-subtle: #ebedf0;
+      --border-card: #e5e7eb;
+      --border-pill: #e2e5ec;
+      --blue-line: #2563eb;
+      --purple-line: #7c3aed;
+      --amber-line: #d97706;
+      --gray-line: #64748b;
+      --green-online: #22c55e;
+
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Inter", sans-serif;
+      color: var(--text-primary);
+      background: var(--bg-app);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg-app);
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+
+    .workspace-frame {
+      display: grid;
+      grid-template-columns: 44px 214px minmax(0, 1fr);
+      min-height: 100vh;
+      background: var(--bg-app);
+    }
+    .workspace-frame.sidebar-collapsed {
+      grid-template-columns: 44px 0px minmax(0, 1fr);
+    }
+    .workspace-frame.sidebar-collapsed .contacts-pane {
+      overflow: hidden;
+      padding: 0;
+      border-right: none;
+    }
+
+    /* 1. 极简左窄栏（砍掉所有多租户/SaaS冗余入口，只留核心控制面） */
+    .rail {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 14px 0;
+      gap: 10px;
+      border-right: 1px solid var(--border-subtle);
+      background: var(--bg-sidebar);
+      user-select: none;
+    }
+    .rail-logo {
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      background: #1e1b4b;
+      color: #fff;
+      font-weight: 800;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 6px;
+      position: relative;
+      cursor: pointer;
+    }
+    .rail-logo::after {
+      content: "";
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      border: 1.5px solid var(--bg-sidebar);
+    }
+    .rail-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #646a73;
+      position: relative;
+      cursor: pointer;
+    }
+    .rail-icon:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .rail-icon.active { background: #e0e7ff; color: #4f46e5; }
+    .rail-badge {
+      position: absolute;
+      top: 0px;
+      right: 0px;
+      background: #d97706;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      min-width: 14px;
+      height: 14px;
+      line-height: 14px;
+      text-align: center;
+      border-radius: 99px;
+      padding: 0 3px;
+      border: 1.5px solid var(--bg-sidebar);
+    }
+    .rail-spacer { flex: 1; }
+
+    /* 2. 二级侧边栏：只保留精锐 Agent 团队与全局态势 */
+    .contacts-pane {
+      background: var(--bg-sidebar);
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-right: 1px solid var(--border-subtle);
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .contacts-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px 2px;
+    }
+    .contacts-title {
+      font-size: 16.5px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #111827;
+      margin: 0;
+    }
+    .collapse-btn {
+      color: #8f959e;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+    }
+    .collapse-btn:hover { background: var(--bg-hover); }
+
+    .now-entry {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      background: transparent;
+      border-radius: 11px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .now-entry:hover { background: #e8ebf0; }
+    .now-entry.active { background: var(--bg-now-active); }
+    .now-entry-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #c7d2fe;
+      color: #4f46e5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .now-entry-title { font-size: 13px; font-weight: 600; color: #1e1b4b; line-height: 1.2; }
+    .now-entry-sub { font-size: 11px; color: #4f46e5; opacity: 0.85; margin-top: 1px; }
+
+    /* 待人工拍板 (SuperAgent Attention) 顶部提醒卡 */
+    .attention-nav-box {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 10px;
+      padding: 7px 9px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .attention-nav-box:hover { border-color: #f59e0b; background: #fef3c7; }
+    .attention-nav-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #92400e;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .attention-nav-desc {
+      font-size: 10.5px;
+      color: #b45309;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .group-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #8f959e;
+      padding: 5px 4px 1px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-list { display: flex; flex-direction: column; gap: 2px; }
+    .nav-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 6px;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: all 0.12s;
+      border: 1px solid transparent;
+    }
+    .nav-row:hover { background: #e8ebf0; }
+    .nav-row.active {
+      background: #dfe6ff;
+      border-color: #c7d2fe;
+    }
+    .nav-row.active .nav-name { color: #1e1b4b; }
+    .nav-row.active .nav-desc { color: #4338ca; font-weight: 500; }
+
+    .mascot { width: 28px; height: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .squad-stack { position: relative; width: 28px; height: 28px; flex-shrink: 0; }
+    .squad-stack-main {
+      width: 22px; height: 22px; border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9.5px; font-weight: 700; color: #fff;
+      position: absolute; top: 1px; left: 0; border: 1.5px solid var(--bg-sidebar);
+    }
+    .squad-stack-sub {
+      width: 16px; height: 16px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 8px; font-weight: 700; color: #fff;
+      position: absolute; bottom: 0; right: 0; border: 1.5px solid var(--bg-sidebar);
+    }
+    .nav-meta { min-width: 0; flex: 1; }
+    .nav-name {
+      font-size: 12px; font-weight: 600; color: #1f2329;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      line-height: 1.25; display: flex; align-items: center; gap: 4px;
+    }
+    .nav-desc {
+      font-size: 10.5px; color: #8f959e;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;
+    }
+    .member-avatar-wrap { position: relative; width: 28px; height: 28px; flex-shrink: 0; }
+    .member-avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 10px; color: #fff;
+    }
+    .online-dot {
+      position: absolute; right: -1px; bottom: -1px;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green-online); border: 1.5px solid var(--bg-sidebar);
+    }
+    .role-badge {
+      display: inline-flex; align-items: center;
+      font-size: 9px; font-weight: 600; color: #646a73;
+      background: #e5e7eb; border-radius: 4px; padding: 0 4px;
+    }
+    .role-badge.leader { color: #4f46e5; background: #e0e7ff; }
+    .role-badge.worker { color: #1d4ed8; background: #dbeafe; }
+    .role-badge.attention { color: #b45309; background: #fef3c7; }
+
+    /* 3. 主面板区域（左侧实时态势图恒定不动 + 右侧伴随式 Session 抽屉） */
+    .main-surface {
+      background: var(--bg-main);
+      margin: 6px 6px 6px 0;
+      border-radius: 16px;
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      min-width: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .now-stage-pane {
+      flex: 1;
+      min-width: 0;
+      padding: 16px 18px 26px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* 顶部架构能力指示条（展示砍掉冗余后保留的 4 大核心原语） */
+    .core-primitives-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .primitive-chip-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 11px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .primitive-chip-card:hover {
+      border-color: #94a3b8;
+      background: #f1f5f9;
+    }
+    .primitive-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .primitive-sub {
+      font-size: 10px;
+      color: #64748b;
+      margin-top: 3px;
+      line-height: 1.3;
+    }
+
+    .now-card {
+      background: #ffffff;
+      border: 1px solid var(--border-card);
+      border-radius: 18px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .stats-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .stats-left { display: flex; align-items: flex-end; gap: 22px; }
+    .stat-block .stat-num {
+      font-size: 32px; font-weight: 600; line-height: 1;
+      letter-spacing: -0.03em; color: #1f2329; font-variant-numeric: tabular-nums;
+    }
+    .stat-block .stat-num .denom { font-size: 20px; font-weight: 400; color: #9ca3af; }
+    .stat-block .stat-caption { font-size: 11px; color: #646a73; margin-top: 4px; }
+
+    .legend-bar {
+      display: flex; align-items: center; flex-wrap: wrap;
+      gap: 13px; font-size: 11px; color: #646a73; padding-bottom: 3px;
+    }
+    .legend-tag { display: inline-flex; align-items: center; gap: 5px; }
+    .pill-btn {
+      background: #ffffff;
+      border: 1px solid #d1d5db;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #1f2329;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .pill-btn:hover { background: #f9fafb; border-color: #9ca3af; }
+
+    .bipartite-stage {
+      position: relative;
+      display: grid;
+      grid-template-columns: 198px minmax(80px, 17%) minmax(200px, 1fr);
+      min-height: 430px;
+      align-items: start;
+    }
+    .left-column {
+      grid-column: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 2;
+    }
+
+    .squad-pod {
+      background: #f8f9fb;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 7px 8px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .squad-pod.focused-pod {
+      border-color: #6366f1;
+      background: #f5f7ff;
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.14);
+    }
+    .squad-pod.dimmed-pod { opacity: 0.42; }
+    .squad-pod-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 2px 2px 5px; border-bottom: 1px dashed #e2e5ec;
+      cursor: pointer; border-radius: 6px;
+    }
+    .squad-pod-header:hover { background: rgba(79, 70, 229, 0.06); }
+    .squad-pod-name {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10.5px; font-weight: 700; color: #374151;
+    }
+    .squad-pod-dot { width: 6px; height: 6px; border-radius: 2px; }
+    .squad-pod-tag {
+      font-size: 9px; font-weight: 600; padding: 1px 5px;
+      border-radius: 99px; color: #646a73; background: #eef0f4;
+    }
+
+    .actor-node {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 3px 4px; border-radius: 8px; cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.12s;
+    }
+    .actor-node:hover { background: #eef0f4; }
+    .actor-node.selected-actor {
+      background: #e0e7ff;
+      border-color: #818cf8;
+    }
+    .actor-node.dimmed-actor { opacity: 0.38; }
+    .actor-node.worker-indent { padding-left: 9px; position: relative; }
+    .actor-node.worker-indent::before {
+      content: ""; position: absolute; left: 3px; top: -3px; bottom: 50%;
+      width: 4px; border-left: 1.5px solid #d1d5db; border-bottom: 1.5px solid #d1d5db;
+    }
+    .actor-left { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .actor-avatar-ring {
+      position: relative; width: 28px; height: 28px; border-radius: 50%;
+      padding: 1.5px; background: linear-gradient(135deg, #c7d2fe, #e0e7ff);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .actor-avatar {
+      width: 100%; height: 100%; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9.5px; font-weight: 700; color: #fff; border: 1.5px solid #ffffff;
+    }
+    .actor-online {
+      position: absolute; right: -1px; bottom: -1px;
+      width: 7.5px; height: 7.5px; border-radius: 50%;
+      background: var(--green-online); border: 1.4px solid #ffffff;
+    }
+    .actor-name-line { display: flex; align-items: center; gap: 4px; }
+    .actor-name { font-size: 11.5px; font-weight: 600; color: #1f2329; white-space: nowrap; }
+    .actor-role-chip {
+      font-size: 8.5px; font-weight: 600; padding: 0 3.5px;
+      border-radius: 3px; background: #dbeafe; color: #1d4ed8;
+    }
+    .actor-role-chip.leader { background: #e0e7ff; color: #4338ca; }
+    .actor-sub { font-size: 9.5px; color: #8f959e; margin-top: 1px; white-space: nowrap; }
+    .origin-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--purple-line); box-shadow: 0 0 0 3.5px rgba(124, 58, 237, 0.16); flex-shrink: 0;
+    }
+    .origin-dot.blue { background: var(--blue-line); box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.16); }
+
+    .right-column {
+      grid-column: 3; display: flex; flex-direction: column;
+      gap: 7px; z-index: 2; min-width: 0; padding-top: 2px;
+    }
+    .task-pill {
+      height: 32px; background: var(--bg-pill); border: 1px solid var(--border-pill);
+      border-radius: 8px; padding: 0 9px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 6px; cursor: pointer; transition: all 0.15s;
+    }
+    .task-pill.group-gap { margin-top: 7px; }
+    .task-pill.selected-pill {
+      border-color: #4f46e5;
+      background: #f5f7ff;
+      box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.16);
+    }
+    .task-pill.attention-pill {
+      border-color: #f59e0b;
+      background: #fffbeb;
+    }
+    .task-pill.dimmed-pill { opacity: 0.38; }
+    .task-pill:hover { border-color: #6366f1; }
+    .task-pill-left { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
+    .task-dot { width: 6.5px; height: 6.5px; border-radius: 50%; flex-shrink: 0; }
+    .task-dot.running { background: var(--blue-line); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16); }
+    .task-dot.dispatching { background: var(--purple-line); box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.16); }
+    .task-dot.in_review { background: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16); }
+    .task-title { font-size: 11.5px; color: #1f2329; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .verdict-mini-badge {
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .verdict-mini-badge.progress { background: #dbeafe; color: #1d4ed8; }
+    .verdict-mini-badge.attention { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
+    .verdict-mini-badge.ready { background: #d1fae5; color: #047857; }
+    .verdict-mini-badge.dispatch { background: #ede9fe; color: #6d28d9; }
+
+    .curves-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+
+    /* ============================================================================
+       4. 右侧伴随式 Session 抽屉（融合 SuperAgent Report/Attention/Handback/两阶段回执）
+       ============================================================================ */
+    .issue-peek-panel {
+      width: 440px;
+      border-left: 1px solid #e5e7eb;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 14px);
+      flex-shrink: 0;
+      box-shadow: -4px 0 18px rgba(15, 23, 42, 0.04);
+    }
+    .peek-header {
+      padding: 11px 14px;
+      border-bottom: 1px solid #ebedf0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .peek-mode-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2.5px 8px;
+      border-radius: 6px;
+    }
+    .peek-mode-badge.leader { background: #ede9fe; color: #6d28d9; }
+    .peek-mode-badge.worker { background: #dbeafe; color: #1d4ed8; }
+    .peek-mode-badge.task { background: #f3f4f6; color: #374151; }
+    .peek-mode-badge.mika { background: #e0e7ff; color: #4338ca; }
+
+    .peek-props-bar {
+      padding: 8px 14px;
+      border-bottom: 1px solid #f0f1f4;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      background: #fafbfc;
+    }
+    .prop-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3.5px 9px;
+      border-radius: 999px;
+      border: 1px solid #e2e5ec;
+      background: #ffffff;
+      color: #4b5563;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .prop-pill:hover { background: #f3f4f6; border-color: #cbd5e1; }
+    .prop-pill.active-tab {
+      background: #1e1b4b;
+      color: #ffffff;
+      border-color: #1e1b4b;
+    }
+
+    .peek-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+    .peek-issue-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: #111827;
+      margin: 0;
+      line-height: 1.35;
+    }
+    .peek-issue-desc {
+      font-size: 11.5px;
+      color: #646a73;
+      line-height: 1.45;
+      margin: 0;
+    }
+
+    /* SuperAgent 机制 1：结构化 Report / Verdict 准出卡片 */
+    .verdict-box {
+      border-radius: 10px;
+      padding: 9px 11px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .verdict-box.ready { background: #ecfdf5; border-color: #a7f3d0; }
+    .verdict-box.progress { background: #eff6ff; border-color: #bfdbfe; }
+    .verdict-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .verdict-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .verdict-tag.ready { background: #059669; color: #fff; }
+    .verdict-tag.progress { background: #2563eb; color: #fff; }
+    .verdict-summary { font-size: 11.5px; color: #1e293b; line-height: 1.4; }
+
+    /* SuperAgent 机制 2：Attention (human_action) 待人工拍板交互卡（边问边继续干活） */
+    .attention-card {
+      background: #fffbeb;
+      border: 1.5px solid #f59e0b;
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      box-shadow: 0 2px 10px rgba(245, 158, 11, 0.1);
+    }
+    .attention-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+      color: #b45309;
+    }
+    .attention-question {
+      font-size: 12px;
+      font-weight: 600;
+      color: #78350f;
+      line-height: 1.4;
+    }
+    .attention-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .attention-btn {
+      background: #ffffff;
+      border: 1px solid #d97706;
+      color: #92400e;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 9px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .attention-btn:hover { background: #fef3c7; }
+
+    /* SuperAgent 机制 3：Subscription 订阅直达 & Handback 越界退回标签 */
+    .sub-bar {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 5px;
+      padding: 6px 9px;
+      background: #f1f5f9;
+      border-radius: 8px;
+      font-size: 10.5px;
+      color: #475569;
+    }
+    .sub-pill {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: #1e293b;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .timeline-divider {
+      font-size: 11px;
+      font-weight: 600;
+      color: #8f959e;
+      border-top: 1px solid #f0f1f4;
+      padding-top: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .comment-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 11px;
+      padding: 10px 12px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .comment-card.active-session-card {
+      border-color: #93c5fd;
+      box-shadow: 0 2px 10px rgba(37, 99, 235, 0.06);
+    }
+    .comment-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+    }
+    .comment-author { font-weight: 600; color: #1f2329; }
+    .comment-task-link {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #4f46e5;
+      background: #eef2ff;
+      padding: 1px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .comment-task-link:hover { background: #e0e7ff; }
+    .comment-time { color: #9ca3af; font-size: 10.5px; margin-left: auto; }
+    .comment-body {
+      font-size: 12px;
+      color: #374151;
+      line-height: 1.48;
+    }
+    .mention-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 5px;
+      border-radius: 4px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      font-weight: 600;
+      font-size: 11px;
+    }
+
+    .inline-run-card {
+      margin-top: 2px;
+      border: 1px solid #dbeafe;
+      background: #f8fafc;
+      border-radius: 9px;
+      overflow: hidden;
+    }
+    .inline-run-header {
+      padding: 7px 10px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11.5px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .inline-run-header:hover { background: #f1f5f9; }
+    .spinner-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+      flex-shrink: 0;
+    }
+    .inline-run-agent { font-weight: 600; color: #1e293b; white-space: nowrap; }
+    .inline-run-summary {
+      color: #64748b;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+    .inline-run-stop {
+      padding: 2px 6px;
+      border-radius: 5px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      font-size: 10px;
+      font-weight: 600;
+      color: #dc2626;
+      cursor: pointer;
+    }
+    .inline-run-steps {
+      border-top: 1px solid #e2e8f0;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: #334155;
+      background: #ffffff;
+    }
+    .trace-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      line-height: 1.4;
+    }
+    .trace-badge {
+      font-size: 9.5px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: #f1f5f9;
+      color: #475569;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .trace-badge.report { background: #dcfce7; color: #15803d; }
+    .trace-badge.handback { background: #fee2e2; color: #b91c1c; }
+    .trace-badge.note { background: #fef3c7; color: #b45309; }
+
+    /* SuperAgent 机制 4：Input 两阶段回执卡片 (waiting -> delivered -> read) */
+    .steer-receipt {
+      background: #eff6ff;
+      border-left: 2.5px solid #2563eb;
+      padding: 5px 8px;
+      border-radius: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 11px;
+      color: #1e40af;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .receipt-state-badge {
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .receipt-state-badge.read { background: #d1fae5; color: #047857; }
+
+    /* 底部固定评论框 + 中文触发状态胶囊 */
+    .sticky-composer {
+      border-top: 1px solid #ebedf0;
+      padding: 10px 12px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .composer-textarea {
+      width: 100%;
+      min-height: 52px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 7px 9px;
+      font-size: 12px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+    }
+    .composer-textarea:focus { border-color: #4f46e5; }
+    .composer-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      position: relative;
+    }
+
+    .trigger-chip-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3.5px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid rgba(37, 99, 235, 0.3);
+      background: rgba(37, 99, 235, 0.08);
+      color: #1e40af;
+      user-select: none;
+    }
+    .trigger-chip-btn:hover { background: rgba(37, 99, 235, 0.14); }
+    .trigger-dropdown {
+      position: absolute;
+      bottom: 34px;
+      left: 0;
+      width: 280px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+      padding: 5px;
+      z-index: 30;
+      display: none;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .trigger-dropdown.open { display: flex; }
+    .trigger-option {
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .trigger-option:hover { background: #f1f5f9; }
+    .trigger-option.selected { background: #eff6ff; }
+    .trigger-opt-title { font-size: 11.5px; font-weight: 600; color: #1e293b; }
+    .trigger-opt-desc { font-size: 10.5px; color: #64748b; line-height: 1.35; }
+
+    .send-btn {
+      background: #4f46e5;
+      color: #ffffff;
+      border: none;
+      border-radius: 7px;
+      padding: 5px 12px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .send-btn:hover { background: #4338ca; }
+  </style>
+</head>
+<body>
+  <div class="workspace-frame" id="workspaceFrame">
+    <!-- 1. 最左侧极简窄栏 -->
+    <nav class="rail">
+      <div class="rail-logo" title="Nocturn · 点击显示全部实时态势" onclick="focusAllNow()">N</div>
+      <div class="rail-icon" title="待你拍板的 Attention 问题 (1)" onclick="selectWorker('pi-coder', 0)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+        <span class="rail-badge" id="railAttentionBadge">1</span>
+      </div>
+      <div class="rail-icon" title="在右侧展开 Mika 总管对话" onclick="selectMika()">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+      </div>
+      <div class="rail-icon active" id="toggleSidebarRailBtn" title="展开/收起侧边栏">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+      </div>
+      <div class="rail-spacer"></div>
+      <div class="rail-icon" title="sota 远端运行时 + 单文件 SQLite Store" onclick="selectWorker('pi-coder', 0)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      </div>
+    </nav>
+
+    <!-- 2. 二级侧边栏：砍掉繁杂设置页，只留【待拍板 Attention + 小队 + 长期智能体】 -->
+    <aside class="contacts-pane">
+      <div class="contacts-header">
+        <h2 class="contacts-title">Nocturn 指挥台</h2>
+        <div class="collapse-btn" id="collapseSidebarBtn" title="收起侧边栏">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+        </div>
+      </div>
+
+      <div class="now-entry" id="navNowAll" onclick="focusAllNow()">
+        <div class="now-entry-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <div>
+          <div class="now-entry-title">实时态势 (全部显示)</div>
+          <div class="now-entry-sub">谁正在干什么 · 二部图</div>
+        </div>
+      </div>
+
+      <!-- 借鉴自 SuperAgent 000-Philosophy：把需要人拍板的 Attention 置顶，健康状态不占空间 -->
+      <div class="attention-nav-box" id="attentionNavBox" onclick="selectWorker('pi-coder', 0)">
+        <div class="attention-nav-title">
+          <span>❓ 待你拍板 (human_action)</span>
+          <span>1 项 ›</span>
+        </div>
+        <div class="attention-nav-desc" id="attentionNavDesc">#427 pi-coder 边干活边提问：移动端抽屉宽度策略</div>
+      </div>
+
+      <div class="group-title"><span>总管与小队 (点击右侧展开)</span><span>3</span></div>
+      <div class="nav-list">
+        <div class="nav-row" data-left-key="mika" onclick="selectMika()">
+          <div class="mascot">
+            <svg width="26" height="26" viewBox="0 0 36 36">
+              <path d="M8 12C8 8.5 12 6 18 6C24 6 28 8.5 28 12V24C28 28 24 30 18 30C12 30 8 28 8 24V12Z" fill="#2b4acb"/>
+              <rect x="13" y="15" width="3.2" height="5" rx="1.6" fill="#fff"/>
+              <rect x="19.8" y="15" width="3.2" height="5" rx="1.6" fill="#fff"/>
+            </svg>
+          </div>
+          <div class="nav-meta">
+            <div class="nav-name">Mika 总管 <span class="role-badge leader">总管</span></div>
+            <div class="nav-desc">接目标、建单并派给小队</div>
+          </div>
+        </div>
+
+        <div class="nav-row" data-left-key="squad:dev" onclick="selectSquadLeader('dev')">
+          <div class="squad-stack">
+            <div class="squad-stack-main" style="background:#4f46e5">研</div>
+            <div class="squad-stack-sub" style="background:#2563eb">+2</div>
+          </div>
+          <div class="nav-meta">
+            <div class="nav-name">研发小队</div>
+            <div class="nav-desc">1 名队长 + 2 名执行组员</div>
+          </div>
+        </div>
+
+        <div class="nav-row" data-left-key="squad:ops" onclick="selectSquadLeader('ops')">
+          <div class="squad-stack">
+            <div class="squad-stack-main" style="background:#7c3aed">运</div>
+            <div class="squad-stack-sub" style="background:#2563eb">+1</div>
+          </div>
+          <div class="nav-meta">
+            <div class="nav-name">实验与运维小队</div>
+            <div class="nav-desc">1 名队长 + 1 名执行组员</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group-title"><span>长期智能体 (sota · Pi 1.5.0)</span><span>5</span></div>
+      <div class="nav-list">
+        <div class="nav-row" data-left-key="actor:dev-leader" onclick="selectSquadLeader('dev')">
+          <div class="member-avatar-wrap">
+            <div class="member-avatar" style="background:#4f46e5">队长</div>
+            <span class="online-dot"></span>
+          </div>
+          <div class="nav-meta">
+            <div class="nav-name">研发小队队长 <span class="role-badge leader">队长</span></div>
+            <div class="nav-desc">处理越界退回单 · 跟进 3 项</div>
+          </div>
+        </div>
+        <div class="nav-row" data-left-key="actor:pi-coder" onclick="selectWorker('pi-coder', 0)">
+          <div class="member-avatar-wrap">
+            <div class="member-avatar" style="background:#2563eb">PI</div>
+            <span class="online-dot"></span>
+          </div>
+          <div class="nav-meta">
+            <div class="nav-name">pi-coder <span class="role-badge attention" id="piCoderBadge">❓1 提问</span></div>
+            <div class="nav-desc">正在工作：#427, #428</div>
+          </div>
+        </div>
+        <div class="nav-row" data-left-key="actor:codex-reviewer" onclick="selectWorker('codex-reviewer', 0)">
+          <div class="member-avatar-wrap">
+            <div class="member-avatar" style="background:#0d9488">审</div>
+            <span class="online-dot"></span>
+          </div>
+          <div class="nav-meta">
+            <div class="nav-name">codex-reviewer <span class="role-badge worker">组员</span></div>
+            <div class="nav-desc">已报 Verdict: ready (#425)</div>
+          </div>
+        </div>
+        <div class="nav-row" data-left-key="actor:ops-leader" onclick="selectSquadLeader('ops')">
+          <div class="member-avatar-wrap">
+            <div class="member-avatar" style="background:#7c3aed">队长</div>
+            <span class="online-dot"></span>
+          </div>
+          <div class="nav-meta">
+            <div class="nav-name">运维小队队长 <span class="role-badge leader">队长</span></div>
+            <div class="nav-desc">等待 #430 Verdict 回调</div>
+          </div>
+        </div>
+        <div class="nav-row" data-left-key="actor:bench-worker" onclick="selectWorker('bench-worker', 0)">
+          <div class="member-avatar-wrap">
+            <div class="member-avatar" style="background:#2563eb">测</div>
+            <span class="online-dot"></span>
+          </div>
+          <div class="nav-meta">
+            <div class="nav-name">pi-bench <span class="role-badge worker">组员</span></div>
+            <div class="nav-desc">正在工作：#430 压测</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 3. 主画面：中间实时态势图 + 右侧提纯版 Session 抽屉 -->
+    <main class="main-surface">
+      <div class="now-stage-pane">
+        <!-- 顶部 4 张快捷体验卡：对应提纯后的 4 个核心机制 -->
+        <div class="core-primitives-bar">
+          <div class="primitive-chip-card" onclick="selectWorker('pi-coder', 0)">
+            <div class="primitive-title"><span>① 结构化 Report & 边问边干</span><span style="color:#d97706">点此看 #427 ›</span></div>
+            <div class="primitive-sub">Worker 调 <code>report(progress + human_action)</code> 抛出拍板问题，不阻塞当前编码</div>
+          </div>
+          <div class="primitive-chip-card" onclick="selectSquadLeader('dev')">
+            <div class="primitive-title"><span>② 订阅直达 & Handback 退回</span><span style="color:#4f46e5">点此看队长 ›</span></div>
+            <div class="primitive-sub">PR/CI 事件直达原 Worker；越界评论由 Worker 调 <code>handback</code> 退回队长另建 #431</div>
+          </div>
+          <div class="primitive-chip-card" onclick="selectWorker('pi-coder', 0)">
+            <div class="primitive-title"><span>③ Input 两阶段回执防丢</span><span style="color:#059669">✓✓ 模型已读 ›</span></div>
+            <div class="primitive-sub">严格区分 <code>delivered(已送达进程)</code> 与 <code>read(已完成当前回合)</code>，崩溃重启自动重放</div>
+          </div>
+          <div class="primitive-chip-card" onclick="selectTask('p4')">
+            <div class="primitive-title"><span>④ Verdict 验收与定向返工</span><span style="color:#0d9488">点此看 #425 ›</span></div>
+            <div class="primitive-sub">组员报 <code>ready</code> 后进待审核；你若驳回，自动打包 Rework Context 唤醒原 Session</div>
+          </div>
+        </div>
+
+        <section class="now-card">
+          <div class="stats-header">
+            <div class="stats-left">
+              <div class="stat-block">
+                <div class="stat-num">5<span class="denom">/5</span></div>
+                <div class="stat-caption">个精锐 Agent 在 sota 上在线</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-num" id="totalTaskCount">5</div>
+                <div class="stat-caption">个活跃任务 Session</div>
+              </div>
+            </div>
+
+            <div class="legend-bar">
+              <div class="legend-tag">
+                <svg width="24" height="10" viewBox="0 0 24 10"><line x1="1" y1="5" x2="23" y2="5" stroke="#7c3aed" stroke-width="2.5" stroke-linecap="round"/></svg>
+                <span>队长派单/处理 Handback</span>
+              </div>
+              <div class="legend-tag">
+                <svg width="24" height="10" viewBox="0 0 24 10"><line x1="1" y1="5" x2="23" y2="5" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round"/></svg>
+                <span>组员执行中 (含 PR 订阅直达)</span>
+              </div>
+              <div class="legend-tag">
+                <svg width="24" height="10" viewBox="0 0 24 10"><line x1="1" y1="5" x2="23" y2="5" stroke="#64748b" stroke-width="2" stroke-dasharray="3.5 3.5" stroke-linecap="round"/></svg>
+                <span>Join Gate 等待 Verdict 回调</span>
+              </div>
+              <button class="pill-btn" id="clearSpotlightBtn" style="display:none;padding:2px 9px;font-size:11px;" onclick="focusAllNow()">✕ 取消聚光灯过滤</button>
+            </div>
+          </div>
+
+          <div class="bipartite-stage" id="bipartiteStage">
+            <div class="left-column" id="leftColumn"></div>
+            <svg class="curves-svg" id="curvesSvg"></svg>
+            <div class="right-column" id="rightColumn"></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 4. 右侧伴随式 Session 抽屉 -->
+      <aside class="issue-peek-panel" id="issuePeekPanel">
+        <div class="peek-header">
+          <span class="peek-mode-badge worker" id="peekModeBadge">⚡ pi-coder · 个人实时终端 Session</span>
+          <span style="font-size:10.5px;color:#8f959e" id="peekHeaderSub">SQLite 事务 + sota Pi 1.5.0</span>
+        </div>
+
+        <div class="peek-props-bar" id="peekPropsBar"></div>
+
+        <div class="peek-scroll" id="peekScroll"></div>
+
+        <div class="sticky-composer">
+          <textarea class="composer-textarea" id="composerInput" placeholder="直接向当前 Session 插话，或下达跨任务纸条 (note)..."></textarea>
+          <div class="composer-footer">
+            <div class="trigger-chip-btn" id="triggerChipBtn">
+              <span id="triggerChipLabel">⚡ pi-coder · 插话到当前运行 ▾</span>
+            </div>
+
+            <div class="trigger-dropdown" id="triggerDropdown">
+              <div class="trigger-option selected" data-action="steer">
+                <span class="trigger-opt-title">⚡ 插话到当前运行 (Input: steer)</span>
+                <span class="trigger-opt-desc" id="optDescSteer">先记为 delivered，当前步骤完成后读入模型标为 read；若中途崩溃重启自动重放。</span>
+              </div>
+              <div class="trigger-option" data-action="after_run">
+                <span class="trigger-opt-title">⏳ 本轮结束后开始 (Input: waiting)</span>
+                <span class="trigger-opt-desc">不打断当前回合，持久化在 Input 队列，等本轮结束后自动恢复原 Session 处理。</span>
+              </div>
+              <div class="trigger-option" data-action="restart">
+                <span class="trigger-opt-title">↻ 停止并重新开始 (Restart)</span>
+                <span class="trigger-opt-desc">立即终止当前运行，带着未 read 的历史插话与本条新消息重新启动回合。</span>
+              </div>
+              <div class="trigger-option" data-action="note">
+                <span class="trigger-opt-title">📌 递只读情报纸条 (SuperAgent: note)</span>
+                <span class="trigger-opt-desc">把其他任务的发现作为只读上下文塞给该智能体，不改变其任务授权范围。</span>
+              </div>
+            </div>
+
+            <button class="send-btn" id="sendCommentBtn">发送 ↵</button>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    // ============================================================================
+    // 提纯融合版核心数据模型：
+    // 融合 Multica (Squad/Session) + 知乎腾讯文 (Verdict/定向返工) + SuperAgent (report/human_action/handback/delivered-vs-read)
+    // ============================================================================
+    const squads = [
+      {
+        id: "dev",
+        name: "研发小队",
+        color: "#4f46e5",
+        tag: "1 队长 · 2 组员",
+        leaderId: "dev-leader",
+        agents: [
+          {
+            id: "dev-leader",
+            name: "研发小队队长",
+            role: "队长",
+            isLeader: true,
+            sub: "处理 Handback 退回单 #431",
+            color: "#4f46e5",
+            initials: "队长",
+            dotType: "purple",
+            leaderSessions: [
+              {
+                taskId: "p1",
+                taskCode: "TASK-431",
+                taskTitle: "#431 新增 GitHub Webhook 签名校验",
+                time: "正在运行 · 00:04",
+                active: true,
+                verdictState: "dispatch",
+                verdictText: "处理 Handback 退回单 · 重新派单中",
+                whatLeaderSaid: "收到 <strong>pi-coder</strong> 从 #427 退回（<code>handback</code>）的越界评论：「顺便把 GitHub Webhook 签名校验也加上」。这不属于 #427 的重构范围，我已将其独立为新任务 <strong>TASK-431</strong> 并正在为其指派执行人。",
+                runTitle: "研发小队队长 · 路由与拆单 Session (运行中)",
+                runSummary: "正在调用 nocturn dispatch 派单并给 #427 递纸条 (note)",
+                steps: [
+                  { badge: "handback", text: "[收到越界退回] pi-coder 调 nocturn handback(trig_89, reason='Webhook 签名属于后端安全独立模块，超出 #427 二部图重构范围')" },
+                  { badge: "步骤", text: "[命令] nocturn dispatch --create-task '新增 GitHub Webhook 签名校验' --assign pi-coder --after TASK-427" },
+                  { badge: "note", text: "[跨任务递纸条] nocturn note TASK-427 'Webhook 签名我已另建 TASK-431 排入队列，你专心完成 #427 即可'" }
+                ]
+              },
+              {
+                taskId: "p2",
+                taskCode: "TASK-427",
+                taskTitle: "#427 仓库页预览与二部图重构",
+                time: "3 分钟前 · Join Gate 等待回调",
+                active: false,
+                verdictState: "progress",
+                verdictText: "已委派 @pi-coder · 订阅 PR #112",
+                whatLeaderSaid: "已委派 <span class='mention-chip'>@pi-coder</span> 在独立 Worktree 执行，并挂载唤醒门禁（等待 <code>nocturn report --state ready</code>）。后续 #427 和 PR #112 上的普通讨论直接走订阅绿色通道进 pi-coder，无需经过我。",
+                runTitle: "研发小队队长 · 派单回合 (已完成并退出进程)",
+                runSummary: "已派单并挂接 Join Gate · 进程已退出零资源占用",
+                steps: [
+                  { badge: "步骤", text: "[命令] nocturn dispatch TASK-427 --to pi-coder --wakeup-on-verdict ready,blocked" },
+                  { badge: "report", text: "[回合结束] 派单完毕立即退出进程 (Stop after dispatching)" }
+                ]
+              },
+              {
+                taskId: "p4",
+                taskCode: "TASK-425",
+                taskTitle: "#425 单用户 Cookie 顺序修复 [待审核]",
+                time: "4 分钟前 · 等待人类最终验收",
+                active: false,
+                verdictState: "ready",
+                verdictText: "组员 Verdict: ready · 已转交人类待审核",
+                whatLeaderSaid: "收到 <span class='mention-chip'>@codex-reviewer</span> 汇报的结构化准出 <code>Verdict: ready</code>（PR #108 的 47 项回归测试全部通过）。我已将任务推进至<strong>【待审核 (in_review)】</strong>，请人类指挥官确认通过或一键驳回返工。",
+                runTitle: "研发小队队长 · 准出核验回合 (已完成)",
+                runSummary: "消费组员结构化 Verdict 并移交人类验收",
+                steps: [
+                  { badge: "report", text: "[唤醒原因] codex-reviewer 提交结构化 Verdict { state: 'ready', pr: 108, tests: '47/47 passed' }" },
+                  { badge: "步骤", text: "[命令] nocturn task status TASK-425 in_review" }
+                ]
+              }
+            ]
+          },
+          {
+            id: "pi-coder",
+            name: "pi-coder",
+            role: "组员",
+            isLeader: false,
+            sub: "2 个会话 · 1 项待你拍板",
+            color: "#2563eb",
+            initials: "PI",
+            dotType: "blue",
+            workerSessions: [
+              {
+                taskId: "p2",
+                taskCode: "TASK-427",
+                taskTitle: "#427 仓库页预览与二部图重构",
+                elapsed: "01:42",
+                active: true,
+                subscriptions: ["Issue #427", "PR #112 (自动绑定)", "CI: unit-tests"],
+                verdict: {
+                  state: "progress",
+                  label: "状态：progress (边提问边继续执行确定性任务)",
+                  summary: "已完成二部图 SVG 曲线与中文语言包改造，已提交 PR #112；移动端抽屉断点策略待人类拍板，当前正在继续补桌面端单测。"
+                },
+                attention: {
+                  id: "att_427",
+                  question: "屏幕宽度小于 960px 时，右侧 Session 抽屉应该做成「全屏浮层覆盖二部图」还是「上下分栏折叠」？",
+                  options: ["做成右侧浮层覆盖 (Overlay)", "做成上下分栏折叠"]
+                },
+                currentThought: "我通过 nocturn report 抛出了 1 个移动端布局拍板问题（human_action），在不依赖该决定的桌面端单测上继续推进，不挂死等待。",
+                runSummary: "命令：pnpm --filter @multica/views test",
+                steps: [
+                  { badge: "步骤", text: "[会话] 挂载独立工作区 /root/code/worktrees/TASK-427 (sota Pi 1.5.0)" },
+                  { badge: "receipt", text: "⚡ [Input 插话] yangxin：「注意所有下拉菜单统一使用中文文案」", receiptState: "read", receiptLabel: "✓✓ 模型已读 (read)" },
+                  { badge: "handback", text: "[越界退回] 收到评论『顺便把 GitHub Webhook 签名校验也加上』 → 调用 nocturn handback(reason='属独立安全模块，退回队长另建任务')" },
+                  { badge: "note", text: "📌 [收到队长纸条] 研发小队队长：「Webhook 签名我已另建 TASK-431，你专心完成 #427 即可」" },
+                  { badge: "report", text: "[结构化上报] nocturn report --state progress --pr 112 --human-action '屏幕宽度小于 960px 时...'" },
+                  { badge: "步骤", text: "[命令] pnpm --filter @multica/views test (正在运行桌面端单测...)" }
+                ]
+              },
+              {
+                taskId: "p3",
+                taskCode: "TASK-428",
+                taskTitle: "#428 会话跨周期 (--resume) 恢复测试",
+                elapsed: "00:51",
+                active: true,
+                subscriptions: ["Issue #428", "PR #115 (自动绑定)"],
+                verdict: {
+                  state: "progress",
+                  label: "状态：progress (跨周期恢复第 2 轮 Run)",
+                  summary: "PR #115 收到 CI 报错事件通过订阅绿色通道直达本 Session，已自动 --resume 原生会话 ses_01j9 正在修复。"
+                },
+                attention: null,
+                currentThought: "收到 PR #115 的 GitHub CI 信号（直接走 Subscription 绿色通道唤醒我，没打扰队长），已恢复原会话上下文并定位到超时原因。",
+                runSummary: "命令：go test ./internal/handler -run TestDaemonClaim",
+                steps: [
+                  { badge: "步骤", text: "[绿色通道唤醒] GitHub PR #115 check_suite:failed 命中订阅，直接拉起原 Session ses_01j9" },
+                  { badge: "步骤", text: "[命令] go test ./internal/handler -run TestDaemonClaim (正在运行...)" }
+                ]
+              }
+            ]
+          },
+          {
+            id: "codex-reviewer",
+            name: "codex-reviewer",
+            role: "组员",
+            isLeader: false,
+            sub: "已提交 Verdict: ready",
+            color: "#0d9488",
+            initials: "审",
+            dotType: "blue",
+            workerSessions: [
+              {
+                taskId: "p4",
+                taskCode: "TASK-425",
+                taskTitle: "#425 单用户 Cookie 顺序修复 [待审核]",
+                elapsed: "01:12",
+                active: false,
+                subscriptions: ["Issue #425", "PR #108"],
+                verdict: {
+                  state: "ready",
+                  label: "准出裁定 Verdict：ready (审查通过 · 可随时定向打回)",
+                  summary: "PR #108 代码边界清晰，47 个回归测试全部通过，无同名 Cookie 顺序覆盖隐患。置信度：高 (0.96)。"
+                },
+                attention: null,
+                currentThought: "已调用 nocturn report --state ready 提交结构化准出报告并退出进程；若人类验收驳回，系统将带着驳回原因恢复我的 ses_01k2 会话。",
+                runSummary: "已完成 · 进程已退出，Session ses_01k2 待命",
+                steps: [
+                  { badge: "步骤", text: "[命令] gh pr diff 108 && go test ./internal/handler -run TestLocalSession" },
+                  { badge: "report", text: "[结构化准出] nocturn report --state ready --pr 108 --summary '47项回归测试全部通过，置信度 0.96'" }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: "ops",
+        name: "实验与运维小队",
+        color: "#7c3aed",
+        tag: "1 队长 · 1 组员",
+        leaderId: "ops-leader",
+        agents: [
+          {
+            id: "ops-leader",
+            name: "运维小队队长",
+            role: "队长",
+            isLeader: true,
+            sub: "Join Gate 等待 #430 Verdict",
+            color: "#7c3aed",
+            initials: "队长",
+            dotType: "purple",
+            leaderSessions: [
+              {
+                taskId: "p5",
+                taskCode: "TASK-430",
+                taskTitle: "#430 Pi 1.5.0 远端长会话稳定性压测",
+                time: "5 分钟前 · 休眠等待回调",
+                active: false,
+                verdictState: "progress",
+                verdictText: "等待 @pi-bench 提交 Verdict",
+                whatLeaderSaid: "已委派 <span class='mention-chip'>@pi-bench</span> 在 sota 节点执行 50 轮连续会话恢复压测，挂接完成唤醒门禁。",
+                runTitle: "运维小队队长 · 派单回合 (已完成并休眠)",
+                runSummary: "已派单给 @pi-bench · 进程已退出",
+                steps: [
+                  { badge: "步骤", text: "[命令] nocturn dispatch TASK-430 --to pi-bench --wakeup-on-verdict ready,failed" }
+                ]
+              }
+            ]
+          },
+          {
+            id: "bench-worker",
+            name: "pi-bench",
+            role: "组员",
+            isLeader: false,
+            sub: "Pi 1.5.0 · 压测 38/50",
+            color: "#2563eb",
+            initials: "测",
+            dotType: "blue",
+            workerSessions: [
+              {
+                taskId: "p5",
+                taskCode: "TASK-430",
+                taskTitle: "#430 Pi 1.5.0 远端长会话稳定性压测",
+                elapsed: "04:19",
+                active: true,
+                subscriptions: ["Issue #430", "Cron: nightly-bench"],
+                verdict: {
+                  state: "progress",
+                  label: "状态：progress (38/50 轮通过)",
+                  summary: "正在 sota 服务器执行第 38/50 轮跨周期会话恢复压测，p95 恢复耗时 180ms，零丢消息。"
+                },
+                attention: null,
+                currentThought: "正在跑第 38/50 轮压测，跑完后将调用 nocturn report --state ready 自动唤醒运维队长。",
+                runSummary: "命令：./scripts/bench-long-session.sh (38/50)",
+                steps: [
+                  { badge: "步骤", text: "[会话] /root/code/bench-worktree (sota Pi 1.5.0)" },
+                  { badge: "步骤", text: "[输出] Round 38/50 passed · p95 resume latency = 180ms · 0 lost inputs" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ];
+
+    const pills = [
+      {
+        id: "p1",
+        squadId: "dev",
+        identifier: "TASK-431",
+        status: "进行中",
+        dotType: "dispatching",
+        title: "#431 新增 GitHub Webhook 签名校验",
+        badgeText: "Handback 新建",
+        badgeClass: "dispatch",
+        links: [{ actorId: "dev-leader", type: "dispatching" }]
+      },
+      {
+        id: "p2",
+        squadId: "dev",
+        identifier: "TASK-427",
+        status: "进行中",
+        dotType: "running",
+        title: "#427 仓库页预览与二部图重构",
+        badgeText: "❓ 待你拍板",
+        badgeClass: "attention",
+        hasAttention: true,
+        links: [
+          { actorId: "dev-leader", type: "waiting" },
+          { actorId: "pi-coder", type: "running" }
+        ],
+        groupStart: true
+      },
+      {
+        id: "p3",
+        squadId: "dev",
+        identifier: "TASK-428",
+        status: "进行中",
+        dotType: "running",
+        title: "#428 会话跨周期 (--resume) 恢复测试",
+        badgeText: "PR 订阅直达",
+        badgeClass: "progress",
+        links: [
+          { actorId: "dev-leader", type: "waiting" },
+          { actorId: "pi-coder", type: "running" }
+        ]
+      },
+      {
+        id: "p4",
+        squadId: "dev",
+        identifier: "TASK-425",
+        status: "待审核",
+        dotType: "in_review",
+        title: "#425 单用户 Cookie 顺序修复",
+        badgeText: "Verdict: ready",
+        badgeClass: "ready",
+        links: [
+          { actorId: "dev-leader", type: "waiting" },
+          { actorId: "codex-reviewer", type: "running" }
+        ],
+        groupStart: true
+      },
+      {
+        id: "p5",
+        squadId: "ops",
+        identifier: "TASK-430",
+        status: "进行中",
+        dotType: "running",
+        title: "#430 Pi 1.5.0 远端长会话稳定性压测",
+        badgeText: "压测 38/50",
+        badgeClass: "progress",
+        links: [
+          { actorId: "ops-leader", type: "waiting" },
+          { actorId: "bench-worker", type: "running" }
+        ],
+        groupStart: true
+      }
+    ];
+
+    const mikaSessionTurns = [
+      {
+        author: "你 (yangxin)",
+        time: "10 分钟前",
+        body: "帮我把仓库页预览和二部图重构做一下，另外让运维小队跑一下 Pi 1.5.0 长会话压测。"
+      },
+      {
+        author: "Mika 总管",
+        time: "9 分钟前",
+        body: "已通过单文件 SQLite 事务创建并派发给两支小队：<br/>1. <strong>TASK-427</strong> → 【研发小队】队长；<br/>2. <strong>TASK-430</strong> → 【实验与运维小队】队长。",
+        steps: [
+          "[Effects 队列] enqueue('launch', 'TASK-427') + enqueue('launch', 'TASK-430')"
+        ]
+      }
+    ];
+
+    // 默认打开 pi-coder 的实时终端 Session，让你一眼看到 SuperAgent 的 Report + Attention(边问边干) + Handback + 两阶段回执！
+    let drawerState = {
+      mode: "worker",
+      squadId: "dev",
+      workerId: "pi-coder",
+      workerSessionIdx: 0,
+      taskId: "p2",
+      spotlightActive: true
+    };
+
+    let hoveredActorId = null;
+    let hoveredPillId = null;
+    let currentTriggerAction = "steer";
+
+    const leftCol = document.getElementById("leftColumn");
+    const rightCol = document.getElementById("rightColumn");
+    const svgEl = document.getElementById("curvesSvg");
+    const stageEl = document.getElementById("bipartiteStage");
+    const peekModeBadge = document.getElementById("peekModeBadge");
+    const peekPropsBar = document.getElementById("peekPropsBar");
+    const peekScrollEl = document.getElementById("peekScroll");
+    const triggerChipBtn = document.getElementById("triggerChipBtn");
+    const triggerChipLabel = document.getElementById("triggerChipLabel");
+    const triggerDropdown = document.getElementById("triggerDropdown");
+    const composerInput = document.getElementById("composerInput");
+    const clearSpotlightBtn = document.getElementById("clearSpotlightBtn");
+
+    function findAgentById(agentId) {
+      for (const s of squads) {
+        for (const a of s.agents) {
+          if (a.id === agentId) return { squad: s, agent: a };
+        }
+      }
+      return null;
+    }
+
+    function selectSquadLeader(squadId) {
+      drawerState.mode = "leader";
+      drawerState.squadId = squadId;
+      drawerState.spotlightActive = true;
+      syncUI();
+    }
+
+    function selectWorker(workerId, sessionIdx = 0) {
+      const found = findAgentById(workerId);
+      if (!found) return;
+      drawerState.mode = "worker";
+      drawerState.squadId = found.squad.id;
+      drawerState.workerId = workerId;
+      drawerState.workerSessionIdx = sessionIdx;
+      drawerState.spotlightActive = true;
+      syncUI();
+    }
+
+    function selectTask(pillId) {
+      const p = pills.find(x => x.id === pillId);
+      if (!p) return;
+      drawerState.mode = "task";
+      drawerState.taskId = pillId;
+      drawerState.squadId = p.squadId;
+      drawerState.spotlightActive = true;
+      syncUI();
+    }
+
+    function selectMika() {
+      drawerState.mode = "mika";
+      drawerState.spotlightActive = false;
+      syncUI();
+    }
+
+    function focusAllNow() {
+      drawerState.spotlightActive = false;
+      syncUI();
+    }
+
+    // 人类一键回答 Worker 抛出的 Attention (human_action) 问题！
+    function resolveAttentionQuestion(workerId, sessionIdx, answerText) {
+      const found = findAgentById(workerId);
+      if (!found) return;
+      const sess = found.agent.workerSessions[sessionIdx];
+      if (!sess) return;
+      sess.attention = null;
+      sess.verdict.label = "状态：progress (已收到你的拍板，全速收尾中)";
+      sess.verdict.summary = `已采用你的拍板决定（「${answerText}」），正在合并移动端抽屉样式并完成最后单测。`;
+      sess.steps.push({
+        badge: "receipt",
+        text: `⚡ [Attention 拍板回复] yangxin 选择了：「${answerText}」`,
+        receiptState: "delivered",
+        receiptLabel: "✓ 已送达进程 (delivered)"
+      });
+
+      // 1.2 秒后模拟模型完成该 step，状态从 delivered 升级为 read！
+      setTimeout(() => {
+        const lastStep = sess.steps[sess.steps.length - 1];
+        if (lastStep && lastStep.receiptState === "delivered") {
+          lastStep.receiptState = "read";
+          lastStep.receiptLabel = "✓✓ 模型已读入上下文 (read)";
+          sess.steps.push({
+            badge: "report",
+            text: `[自动清除 Attention] nocturn report --state progress --human-action null (已按「${answerText}」实现)`
+          });
+          syncUI();
+        }
+      }, 1100);
+
+      // 更新左侧与胶囊状态
+      const p2 = pills.find(x => x.id === "p2");
+      if (p2) {
+        p2.hasAttention = false;
+        p2.badgeText = "工作中 (已拍板)";
+        p2.badgeClass = "progress";
+      }
+      document.getElementById("attentionNavBox").style.display = "none";
+      document.getElementById("railAttentionBadge").style.display = "none";
+      const piBadge = document.getElementById("piCoderBadge");
+      if (piBadge) {
+        piBadge.className = "role-badge worker";
+        piBadge.textContent = "组员";
+      }
+      syncUI();
+    }
+
+    // 定向返工 (Rework Context)：从待审核一键打回给原 Worker 的原 Session！
+    function triggerTargetedRework(pillId) {
+      const reason = prompt("请输入驳回返工原因（将自动打包上次 Verdict 产物 + 你的驳回理由，通过 --resume 唤醒原组员 Session）：", "高并发下 Set-Cookie 切片还需要补充 1 个并发竞态单测");
+      if (!reason) return;
+      const p = pills.find(x => x.id === pillId);
+      if (!p) return;
+      p.status = "进行中";
+      p.dotType = "running";
+      p.badgeText = "定向返工中";
+      p.badgeClass = "progress";
+
+      const found = findAgentById("codex-reviewer");
+      if (found && found.agent.workerSessions[0]) {
+        const ws = found.agent.workerSessions[0];
+        ws.active = true;
+        ws.verdict.state = "progress";
+        ws.verdict.label = "状态：progress (定向返工 Rework 唤醒原会话 ses_01k2)";
+        ws.verdict.summary = `收到人类验收驳回，已自动携带上次 PR #108 产物与驳回原因恢复原会话继续修改。`;
+        ws.steps.push({
+          badge: "receipt",
+          text: `↩️ [定向返工 Rework Context] 人类驳回原因：「${reason}」（已自动恢复原会话 ses_01k2）`,
+          receiptState: "read",
+          receiptLabel: "✓✓ 模型已读 (read)"
+        });
+      }
+      selectWorker("codex-reviewer", 0);
+    }
+
+    function isActorHighlighted(actorId, squadId) {
+      if (!drawerState.spotlightActive) return true;
+      if (drawerState.mode === "leader") return squadId === drawerState.squadId;
+      if (drawerState.mode === "worker") return actorId === drawerState.workerId;
+      if (drawerState.mode === "task") {
+        const p = pills.find(x => x.id === drawerState.taskId);
+        return p ? p.links.some(l => l.actorId === actorId) : true;
+      }
+      return true;
+    }
+
+    function isPillHighlighted(pill) {
+      if (!drawerState.spotlightActive) return true;
+      if (drawerState.mode === "leader") return pill.squadId === drawerState.squadId;
+      if (drawerState.mode === "worker") return pill.links.some(l => l.actorId === drawerState.workerId);
+      if (drawerState.mode === "task") return pill.id === drawerState.taskId;
+      return true;
+    }
+
+    function getCurrentTargetName() {
+      if (drawerState.mode === "leader") {
+        const s = squads.find(x => x.id === drawerState.squadId) || squads[0];
+        return s.agents[0].name;
+      }
+      if (drawerState.mode === "worker") {
+        const found = findAgentById(drawerState.workerId);
+        return found ? found.agent.name : "pi-coder";
+      }
+      if (drawerState.mode === "mika") return "Mika 总管";
+      const p = pills.find(x => x.id === drawerState.taskId) || pills[1];
+      const runningLink = p.links.find(l => l.type === "running" || l.type === "dispatching") || p.links[0];
+      const found = findAgentById(runningLink.actorId);
+      return found ? found.agent.name : "智能体";
+    }
+
+    function updateTriggerChipText() {
+      const targetName = getCurrentTargetName();
+      const map = {
+        steer: `⚡ ${targetName} · 插话到当前运行 ▾`,
+        after_run: `⏳ ${targetName} · 本轮结束后开始 ▾`,
+        restart: `↻ ${targetName} · 停止并重新开始 ▾`,
+        note: `📌 ${targetName} · 递只读情报纸条 (note) ▾`
+      };
+      triggerChipLabel.textContent = map[currentTriggerAction] || map.steer;
+    }
+
+    function renderStepItem(st) {
+      if (st.badge === "receipt") {
+        return `
+          <div class="steer-receipt">
+            <span>${st.text}</span>
+            <span class="receipt-state-badge ${st.receiptState === 'read' ? 'read' : ''}">${st.receiptLabel}</span>
+          </div>
+        `;
+      }
+      const badgeClass = st.badge === "report" ? "report" : (st.badge === "handback" ? "handback" : (st.badge === "note" ? "note" : ""));
+      const label = st.badge === "report" ? "Report" : (st.badge === "handback" ? "Handback" : (st.badge === "note" ? "Note" : st.badge));
+      return `<div class="trace-step"><span class="trace-badge ${badgeClass}">${label}</span><span>${st.text}</span></div>`;
+    }
+
+    // ============================================================================
+    // 渲染右侧伴随式 Session 抽屉
+    // ============================================================================
+    function renderPeekDrawer() {
+      updateTriggerChipText();
+
+      // 1. 队长调度 Session 视图
+      if (drawerState.mode === "leader") {
+        const s = squads.find(x => x.id === drawerState.squadId) || squads[0];
+        const leader = s.agents[0];
+        peekModeBadge.className = "peek-mode-badge leader";
+        peekModeBadge.innerHTML = `👑 ${s.name} · 队长调度与 Handback 路由`;
+
+        peekPropsBar.innerHTML = s.agents.map(a => {
+          const isCurrent = a.isLeader;
+          const icon = a.isLeader ? "👑" : "🟢";
+          const clickAttr = a.isLeader ? `selectSquadLeader('${s.id}')` : `selectWorker('${a.id}', 0)`;
+          return `<div class="prop-pill ${isCurrent ? 'active-tab' : ''}" onclick="${clickAttr}">${icon} ${a.name}</div>`;
+        }).join("");
+
+        composerInput.placeholder = `直接对【${leader.name}】插话，或下达新任务...`;
+
+        let html = `
+          <h3 class="peek-issue-title">👑 ${leader.name} · 脉冲式调度 Session</h3>
+          <p class="peek-issue-desc">融合 <strong>Multica 小队拆单</strong> 与 <strong>SuperAgent 越界退回 (Handback) + 跨任务递纸条 (Note)</strong>：队长平时不占进程，仅在新单进入、组员退回越界需求、或组员提交结构化 Verdict 时唤醒。</p>
+          <div class="timeline-divider">
+            <span>队长跨任务决策记录 (${leader.leaderSessions.length})</span>
+            <span>点击任务号切单任务视角</span>
+          </div>
+        `;
+
+        leader.leaderSessions.forEach(sess => {
+          const stepsHtml = sess.steps.map(renderStepItem).join("");
+          html += `
+            <div class="comment-card ${sess.active ? 'active-session-card' : ''}">
+              <div class="comment-header">
+                <span class="comment-author">👑 ${leader.name}</span>
+                <span class="comment-task-link" onclick="selectTask('${sess.taskId}')">${sess.taskCode} ›</span>
+                <span class="comment-time">${sess.time}</span>
+              </div>
+              <div style="font-size:11.5px;font-weight:700;color:#111827;">${sess.taskTitle}</div>
+              <div class="comment-body">${sess.whatLeaderSaid}</div>
+              <div class="inline-run-card">
+                <div class="inline-run-header" onclick="const el=this.nextElementSibling; el.style.display = el.style.display==='none' ? 'flex' : 'none';">
+                  <span class="spinner-dot" style="background:${sess.active ? '#7c3aed' : '#10b981'}"></span>
+                  <span class="inline-run-agent">${sess.runTitle}</span>
+                  <span class="inline-run-summary">${sess.runSummary}</span>
+                </div>
+                <div class="inline-run-steps" style="display:flex;">
+                  ${stepsHtml}
+                </div>
+              </div>
+            </div>
+          `;
+        });
+
+        peekScrollEl.innerHTML = html;
+        return;
+      }
+
+      // 2. 组员专属实时终端 Session 视图（展示 Report / Attention / Subscription / 两阶段回执）
+      if (drawerState.mode === "worker") {
+        const found = findAgentById(drawerState.workerId) || findAgentById("pi-coder");
+        const { squad, agent } = found;
+        const sessions = agent.workerSessions || [];
+        const activeSess = sessions[drawerState.workerSessionIdx] || sessions[0];
+
+        peekModeBadge.className = "peek-mode-badge worker";
+        peekModeBadge.innerHTML = `⚡ ${agent.name} · 个人实时终端 Session`;
+
+        let tabsHtml = `<div class="prop-pill" onclick="selectSquadLeader('${squad.id}')">← 👑 ${squad.name}队长</div>`;
+        sessions.forEach((sess, idx) => {
+          const isCur = idx === drawerState.workerSessionIdx;
+          tabsHtml += `
+            <div class="prop-pill ${isCur ? 'active-tab' : ''}" onclick="selectWorker('${agent.id}', ${idx})">
+              <span>${sess.active ? '🟢' : '✅'} ${sess.taskCode} (${sess.elapsed})</span>
+            </div>
+          `;
+        });
+        peekPropsBar.innerHTML = tabsHtml;
+
+        composerInput.placeholder = `向 ${agent.name} 在 ${activeSess.taskCode} 的运行回合发送插话（自动追踪 delivered → read 两阶段回执）...`;
+
+        const subsHtml = (activeSess.subscriptions || []).map(sub => `<span class="sub-pill">${sub}</span>`).join("");
+
+        // 如果该 Session 存在待人工拍板的 Attention (human_action)，在最醒目位置渲染拍板卡片！
+        const attentionHtml = activeSess.attention ? `
+          <div class="attention-card">
+            <div class="attention-card-header">
+              <span>❓ 待你拍板 (nocturn report human_action)</span>
+              <span>边提问边继续执行中</span>
+            </div>
+            <div class="attention-question">${activeSess.attention.question}</div>
+            <div class="attention-actions">
+              ${activeSess.attention.options.map(opt => `
+                <button class="attention-btn" onclick="resolveAttentionQuestion('${agent.id}', ${drawerState.workerSessionIdx}, '${opt}')">✓ 拍板选择：${opt}</button>
+              `).join("")}
+            </div>
+          </div>
+        ` : "";
+
+        // 如果是 ready 状态的任务（如 #425），提供一键「验收通过」或「定向打回返工 (Rework)」按钮
+        const reworkBarHtml = activeSess.verdict.state === "ready" ? `
+          <div style="display:flex;gap:8px;margin-top:4px;">
+            <button class="pill-btn" style="background:#059669;color:#fff;border-color:#059669;" onclick="alert('已验收通过并关闭任务！')">✓ 人类验收通过 (Done)</button>
+            <button class="pill-btn" style="color:#b91c1c;border-color:#fca5a5;background:#fef2f2;" onclick="triggerTargetedRework('${activeSess.taskId}')">↩️ 驳回并带上下文定向返工 (Rework)</button>
+          </div>
+        ` : "";
+
+        const stepsHtml = activeSess.steps.map(renderStepItem).join("");
+
+        peekScrollEl.innerHTML = `
+          <h3 class="peek-issue-title">${agent.name} · ${activeSess.taskTitle}</h3>
+
+          <!-- 订阅绿色通道状态栏 (SuperAgent Subscription) -->
+          <div class="sub-bar">
+            <span>🔔 绿色通道订阅直达 (免唤醒队长)：</span>
+            ${subsHtml}
+          </div>
+
+          ${attentionHtml}
+
+          <!-- 结构化准出与进度裁定卡 (知乎 Verdict + SuperAgent orchestrator_report) -->
+          <div class="verdict-box ${activeSess.verdict.state}">
+            <div class="verdict-header">
+              <span class="verdict-tag ${activeSess.verdict.state}">nocturn report</span>
+              <span>${activeSess.verdict.label}</span>
+            </div>
+            <div class="verdict-summary">${activeSess.verdict.summary}</div>
+            ${reworkBarHtml}
+          </div>
+
+          <div class="timeline-divider">
+            <span>Pi 1.5.0 实时步骤与 Input 两阶段回执流</span>
+            <span class="comment-task-link" onclick="selectTask('${activeSess.taskId}')">查看 ${activeSess.taskCode} 完整协作链 ›</span>
+          </div>
+
+          <div class="comment-card active-session-card">
+            <div class="comment-header">
+              <span class="comment-author">⚡ ${agent.name}</span>
+              <span class="role-badge worker">当前思考</span>
+              <span class="comment-time">耗时 ${activeSess.elapsed}</span>
+            </div>
+            <div class="comment-body">${activeSess.currentThought}</div>
+
+            <div class="inline-run-card">
+              <div class="inline-run-header">
+                <span class="spinner-dot" style="background:${activeSess.active ? '#2563eb' : '#10b981'}"></span>
+                <span class="inline-run-agent">${agent.name} · 原生 Session</span>
+                <span class="inline-run-summary">${activeSess.runSummary}</span>
+                ${activeSess.active ? `<button class="inline-run-stop" onclick="alert('已向 sota Daemon 发送停止信号')">■ 停止</button>` : ""}
+              </div>
+              <div class="inline-run-steps" style="display:flex;">
+                ${stepsHtml}
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // 3. Mika 总管全局对话视图
+      if (drawerState.mode === "mika") {
+        peekModeBadge.className = "peek-mode-badge mika";
+        peekModeBadge.innerHTML = `💬 Mika 总管 · 全局对话 Session`;
+        peekPropsBar.innerHTML = `
+          <div class="prop-pill active-tab">🤖 Mika Chief of Staff (sota · Pi 1.5.0)</div>
+          <div class="prop-pill" onclick="selectSquadLeader('dev')">查看研发小队</div>
+        `;
+        composerInput.placeholder = `直接告诉 Mika 你想做什么（Mika 建单后写入 SQLite Effects 队列，左边二部图实时长出新连线）...`;
+
+        const turnsHtml = mikaSessionTurns.map(t => {
+          const stepsBlock = t.steps ? `
+            <div class="inline-run-card" style="margin-top:4px;">
+              <div class="inline-run-steps" style="display:flex;">
+                ${t.steps.map(s => `<div class="trace-step"><span class="trace-badge">Effects</span><span>${s}</span></div>`).join("")}
+              </div>
+            </div>
+          ` : "";
+          return `
+            <div class="comment-card">
+              <div class="comment-header">
+                <span class="comment-author">${t.author}</span>
+                <span class="comment-time">${t.time}</span>
+              </div>
+              <div class="comment-body">${t.body}</div>
+              ${stepsBlock}
+            </div>
+          `;
+        }).join("");
+
+        peekScrollEl.innerHTML = `
+          <h3 class="peek-issue-title">💬 与工作区总管 Mika 对话</h3>
+          <p class="peek-issue-desc">边看左边二部图的全局实时负载，边在抽屉里让 Mika 拆解新计划并派给小队。</p>
+          <div class="timeline-divider">
+            <span>Mika 会话记录</span>
+            <span>SQLite 持久化</span>
+          </div>
+          ${turnsHtml}
+        `;
+        return;
+      }
+
+      // 4. 单个任务的完整协作流（含结构化 Verdict 验收与定向打回）
+      const p = pills.find(x => x.id === drawerState.taskId) || pills[1];
+      const s = squads.find(x => x.id === p.squadId) || squads[0];
+      const leader = s.agents[0];
+      const leaderSess = leader.leaderSessions.find(ls => ls.taskId === p.id);
+
+      peekModeBadge.className = "peek-mode-badge task";
+      peekModeBadge.innerHTML = `📋 ${p.identifier} · 任务协作与 Verdict 验收`;
+
+      peekPropsBar.innerHTML = `
+        <div class="prop-pill" onclick="cycleTaskStatus('${p.id}')">
+          <span class="task-dot ${p.dotType}"></span>
+          <span>状态：${p.status} ▾</span>
+        </div>
+        <div class="prop-pill" onclick="triggerTargetedRework('${p.id}')">↩️ 驳回并定向返工 (Rework)</div>
+        <div class="prop-pill" onclick="selectSquadLeader('${s.id}')">👑 ${s.name}队长</div>
+      `;
+
+      composerInput.placeholder = `在 ${p.identifier} 下直接向当前执行人插话...`;
+
+      let cardsHtml = "";
+      if (leaderSess) {
+        cardsHtml += `
+          <div class="comment-card">
+            <div class="comment-header">
+              <span class="comment-author">👑 ${leader.name}</span>
+              <span class="role-badge leader">队长调度 Session</span>
+              <span class="comment-time">${leaderSess.time}</span>
+            </div>
+            <div class="comment-body">${leaderSess.whatLeaderSaid}</div>
+            <div class="inline-run-card">
+              <div class="inline-run-steps" style="display:flex;">
+                ${leaderSess.steps.map(renderStepItem).join("")}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      s.agents.filter(a => !a.isLeader).forEach(w => {
+        (w.workerSessions || []).filter(ws => ws.taskId === p.id).forEach((ws, idx) => {
+          cardsHtml += `
+            <div class="comment-card active-session-card">
+              <div class="comment-header">
+                <span class="comment-author">⚡ ${w.name}</span>
+                <span class="comment-task-link" onclick="selectWorker('${w.id}', ${idx})">进入组员专属终端 ›</span>
+                <span class="comment-time">耗时 ${ws.elapsed}</span>
+              </div>
+              <div class="verdict-box ${ws.verdict.state}">
+                <div class="verdict-header">
+                  <span class="verdict-tag ${ws.verdict.state}">Verdict: ${ws.verdict.state}</span>
+                  <span>${ws.verdict.label}</span>
+                </div>
+                <div class="verdict-summary">${ws.verdict.summary}</div>
+              </div>
+              <div class="inline-run-card">
+                <div class="inline-run-steps" style="display:flex;">
+                  ${ws.steps.map(renderStepItem).join("")}
+                </div>
+              </div>
+            </div>
+          `;
+        });
+      });
+
+      peekScrollEl.innerHTML = `
+        <h3 class="peek-issue-title">${p.title}</h3>
+        <p class="peek-issue-desc">完整串联该任务的<strong>队长拆单 → 组员执行 → 结构化 Verdict 准出 → 人类验收/定向返工</strong>闭环。</p>
+        <div class="timeline-divider">
+          <span>任务协作与 Verdict 链路</span>
+          <span>sota · Pi 1.5.0</span>
+        </div>
+        ${cardsHtml}
+      `;
+    }
+
+    function cycleTaskStatus(pillId) {
+      const p = pills.find(x => x.id === pillId);
+      if (!p) return;
+      p.status = p.status === "进行中" ? "待审核" : (p.status === "待审核" ? "已完成" : "进行中");
+      p.dotType = p.status === "待审核" ? "in_review" : "running";
+      syncUI();
+    }
+
+    function syncUI() {
+      document.getElementById("navNowAll").classList.toggle("active", !drawerState.spotlightActive && drawerState.mode !== "mika");
+      clearSpotlightBtn.style.display = drawerState.spotlightActive ? "inline-flex" : "none";
+      document.getElementById("totalTaskCount").textContent = String(pills.length);
+
+      document.querySelectorAll(".contacts-pane .nav-row").forEach(row => {
+        const key = row.dataset.leftKey;
+        let active = false;
+        if (drawerState.mode === "mika" && key === "mika") active = true;
+        if (drawerState.mode === "leader" && drawerState.spotlightActive) {
+          if (key === `squad:${drawerState.squadId}`) active = true;
+          const s = squads.find(x => x.id === drawerState.squadId);
+          if (s && key === `actor:${s.leaderId}`) active = true;
+        }
+        if (drawerState.mode === "worker" && drawerState.spotlightActive && key === `actor:${drawerState.workerId}`) {
+          active = true;
+        }
+        row.classList.toggle("active", active);
+      });
+
+      leftCol.innerHTML = "";
+      squads.forEach(s => {
+        const pod = document.createElement("div");
+        const podFocused = drawerState.spotlightActive && drawerState.mode === "leader" && drawerState.squadId === s.id;
+        const podDimmed = drawerState.spotlightActive && (
+          (drawerState.mode === "leader" && drawerState.squadId !== s.id) ||
+          (drawerState.mode === "worker" && drawerState.squadId !== s.id) ||
+          (drawerState.mode === "task" && drawerState.squadId !== s.id)
+        );
+        pod.className = "squad-pod" + (podFocused ? " focused-pod" : "") + (podDimmed ? " dimmed-pod" : "");
+
+        const header = document.createElement("div");
+        header.className = "squad-pod-header";
+        header.innerHTML = `
+          <span class="squad-pod-name">
+            <span class="squad-pod-dot" style="background:${s.color}"></span>
+            ${s.name}
+          </span>
+          <span class="squad-pod-tag">${s.tag}</span>
+        `;
+        header.addEventListener("click", () => selectSquadLeader(s.id));
+        pod.appendChild(header);
+
+        s.agents.forEach(a => {
+          const node = document.createElement("div");
+          const isActorSelected = drawerState.spotlightActive && (
+            (drawerState.mode === "leader" && a.isLeader && drawerState.squadId === s.id) ||
+            (drawerState.mode === "worker" && drawerState.workerId === a.id)
+          );
+          const isActorDim = !isActorHighlighted(a.id, s.id);
+          node.className = "actor-node"
+            + (a.isLeader ? "" : " worker-indent")
+            + (isActorSelected ? " selected-actor" : "")
+            + (isActorDim ? " dimmed-actor" : "");
+          node.dataset.actorId = a.id;
+          node.dataset.squadId = s.id;
+          const dotClass = a.dotType === "blue" ? "blue" : "";
+          const roleClass = a.isLeader ? "leader" : "";
+
+          node.innerHTML = `
+            <div class="actor-left">
+              <div class="actor-avatar-ring">
+                <div class="actor-avatar" style="background:${a.color}">${a.initials}</div>
+                <span class="actor-online"></span>
+              </div>
+              <div>
+                <div class="actor-name-line">
+                  <span class="actor-name">${a.name}</span>
+                  <span class="actor-role-chip ${roleClass}">${a.role}</span>
+                </div>
+                <div class="actor-sub">${a.sub}</div>
+              </div>
+            </div>
+            <span class="origin-dot ${dotClass}"></span>
+          `;
+          node.addEventListener("mouseenter", () => { hoveredActorId = a.id; drawCurves(); });
+          node.addEventListener("mouseleave", () => { hoveredActorId = null; drawCurves(); });
+          node.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (a.isLeader) selectSquadLeader(s.id);
+            else selectWorker(a.id, 0);
+          });
+          pod.appendChild(node);
+        });
+        leftCol.appendChild(pod);
+      });
+
+      rightCol.innerHTML = "";
+      pills.forEach(p => {
+        const el = document.createElement("div");
+        const isSelected = (drawerState.mode === "task" && drawerState.taskId === p.id);
+        const isDimmed = !isPillHighlighted(p);
+        el.className = "task-pill"
+          + (p.groupStart ? " group-gap" : "")
+          + (isSelected ? " selected-pill" : "")
+          + (p.hasAttention ? " attention-pill" : "")
+          + (isDimmed ? " dimmed-pill" : "");
+        el.dataset.pillId = p.id;
+        el.innerHTML = `
+          <div class="task-pill-left">
+            <span class="task-dot ${p.dotType}"></span>
+            <span class="task-title">${p.title}</span>
+          </div>
+          <span class="verdict-mini-badge ${p.badgeClass}">${p.badgeText}</span>
+        `;
+        el.addEventListener("mouseenter", () => { hoveredPillId = p.id; drawCurves(); });
+        el.addEventListener("mouseleave", () => { hoveredPillId = null; drawCurves(); });
+        el.addEventListener("click", () => selectTask(p.id));
+        rightCol.appendChild(el);
+      });
+
+      renderPeekDrawer();
+      requestAnimationFrame(drawCurves);
+    }
+
+    function drawCurves() {
+      const stageRect = stageEl.getBoundingClientRect();
+      const actorAnchors = {};
+      const pillAnchors = {};
+
+      leftCol.querySelectorAll(".actor-node").forEach(node => {
+        const dotEl = node.querySelector(".origin-dot");
+        const r = dotEl.getBoundingClientRect();
+        actorAnchors[node.dataset.actorId] = {
+          x: r.left - stageRect.left + r.width / 2,
+          y: r.top - stageRect.top + r.height / 2
+        };
+      });
+
+      rightCol.querySelectorAll(".task-pill").forEach(el => {
+        const r = el.getBoundingClientRect();
+        pillAnchors[el.dataset.pillId] = {
+          x: r.left - stageRect.left,
+          y: r.top - stageRect.top + r.height / 2
+        };
+      });
+
+      svgEl.setAttribute("viewBox", `0 0 ${stageRect.width} ${stageRect.height}`);
+      svgEl.innerHTML = "";
+
+      pills.forEach(p => {
+        const dst = pillAnchors[p.id];
+        if (!dst) return;
+        p.links.forEach(l => {
+          const src = actorAnchors[l.actorId];
+          if (!src) return;
+          const span = dst.x - src.x;
+          const pathData = `M ${src.x} ${src.y} C ${src.x + span * 0.46} ${src.y}, ${dst.x - span * 0.46} ${dst.y}, ${dst.x} ${dst.y}`;
+
+          const hoverDimmed = (hoveredActorId && hoveredActorId !== l.actorId) || (hoveredPillId && hoveredPillId !== p.id);
+          let spotlightDimmed = false;
+          if (drawerState.spotlightActive) {
+            if (drawerState.mode === "leader" && p.squadId !== drawerState.squadId) spotlightDimmed = true;
+            if (drawerState.mode === "worker" && l.actorId !== drawerState.workerId) spotlightDimmed = true;
+            if (drawerState.mode === "task" && p.id !== drawerState.taskId) spotlightDimmed = true;
+          }
+          const dimmed = hoverDimmed || spotlightDimmed;
+
+          let color = l.type === "running" ? "#2563eb" : (l.type === "dispatching" ? "#7c3aed" : "#64748b");
+
+          if (l.type !== "waiting" && !dimmed) {
+            const glow = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            glow.setAttribute("d", pathData);
+            glow.setAttribute("fill", "none");
+            glow.setAttribute("stroke", color);
+            glow.setAttribute("stroke-width", "5");
+            glow.setAttribute("opacity", "0.16");
+            svgEl.appendChild(glow);
+          }
+
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          line.setAttribute("d", pathData);
+          line.setAttribute("fill", "none");
+          line.setAttribute("stroke", color);
+          line.setAttribute("stroke-width", dimmed ? "1.1" : (l.type === "waiting" ? "1.4" : "2.1"));
+          line.setAttribute("opacity", dimmed ? "0.14" : (l.type === "waiting" ? "0.65" : "0.96"));
+          if (l.type === "waiting") line.setAttribute("stroke-dasharray", "4 4");
+          svgEl.appendChild(line);
+        });
+      });
+    }
+
+    triggerChipBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      triggerDropdown.classList.toggle("open");
+    });
+    document.querySelectorAll(".trigger-option").forEach(opt => {
+      opt.addEventListener("click", (e) => {
+        e.stopPropagation();
+        document.querySelectorAll(".trigger-option").forEach(o => o.classList.remove("selected"));
+        opt.classList.add("selected");
+        currentTriggerAction = opt.dataset.action;
+        updateTriggerChipText();
+        triggerDropdown.classList.remove("open");
+      });
+    });
+    document.addEventListener("click", () => triggerDropdown.classList.remove("open"));
+
+    // 发送插话或纸条：现场演示 SuperAgent 的 delivered -> read 两阶段回执变化！
+    document.getElementById("sendCommentBtn").addEventListener("click", () => {
+      const val = composerInput.value.trim();
+      if (!val) return;
+
+      if (drawerState.mode === "worker") {
+        const found = findAgentById(drawerState.workerId);
+        if (found && found.agent.workerSessions[drawerState.workerSessionIdx]) {
+          const ws = found.agent.workerSessions[drawerState.workerSessionIdx];
+          if (currentTriggerAction === "note") {
+            ws.steps.push({ badge: "note", text: `📌 [收到情报纸条] yangxin：「${val}」（只读上下文，不改变授权范围）` });
+          } else {
+            const newReceipt = {
+              badge: "receipt",
+              text: `⚡ [Input · ${currentTriggerAction}] yangxin：「${val}」`,
+              receiptState: "delivered",
+              receiptLabel: "✓ 已送达进程 (delivered)"
+            };
+            ws.steps.push(newReceipt);
+            // 1 秒后模拟模型完成当前 step，回执自动从 delivered 变为 read！
+            setTimeout(() => {
+              newReceipt.receiptState = "read";
+              newReceipt.receiptLabel = "✓✓ 模型已读入上下文 (read)";
+              syncUI();
+            }, 1000);
+          }
+        }
+      } else if (drawerState.mode === "leader") {
+        const s = squads.find(x => x.id === drawerState.squadId) || squads[0];
+        const leader = s.agents[0];
+        leader.leaderSessions[0].steps.push({
+          badge: "receipt",
+          text: `⚡ [Input 插话] yangxin 对队长说：「${val}」`,
+          receiptState: "read",
+          receiptLabel: "✓✓ 模型已读 (read)"
+        });
+      } else if (drawerState.mode === "mika") {
+        const newCode = "TASK-" + (432 + pills.length);
+        mikaSessionTurns.push({ author: "你 (yangxin)", time: "刚刚", body: val });
+        mikaSessionTurns.push({
+          author: "Mika 总管",
+          time: "刚刚",
+          body: `已通过 SQLite 事务创建 <strong>${newCode} 「${val}」</strong> 并入队 <code>Effects(launch)</code> 指派给【研发小队】队长！`,
+          steps: [`[Effects 队列] enqueue('launch', '${newCode}') -> 已唤醒研发小队队长`]
+        });
+        const newPillId = "p_" + Date.now();
+        pills.unshift({
+          id: newPillId,
+          squadId: "dev",
+          identifier: newCode,
+          status: "进行中",
+          dotType: "dispatching",
+          title: `#${newCode.split("-")[1]} ${val}`,
+          badgeText: "队长派单中",
+          badgeClass: "dispatch",
+          links: [{ actorId: "dev-leader", type: "dispatching" }]
+        });
+      }
+
+      composerInput.value = "";
+      syncUI();
+    });
+
+    const frameEl = document.getElementById("workspaceFrame");
+    function toggleSidebar() {
+      frameEl.classList.toggle("sidebar-collapsed");
+      setTimeout(() => requestAnimationFrame(drawCurves), 180);
+    }
+    document.getElementById("collapseSidebarBtn").addEventListener("click", toggleSidebar);
+    document.getElementById("toggleSidebarRailBtn").addEventListener("click", toggleSidebar);
+
+    window.addEventListener("resize", () => requestAnimationFrame(drawCurves));
+    syncUI();
+  </script>
+</body>
+</html>

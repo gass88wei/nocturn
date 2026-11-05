@@ -1,0 +1,17 @@
+{
+  "name": "nocturn",
+  "version": "0.1.0",
+  "description": "Persistent Multi-Agent Orchestration & Harness Platform (Distilled from Multica, TEG Loop Engineering, and DeepSeek SuperAgent)",
+  "type": "module",
+  "bin": {
+    "nocturn": "./src/tools/nocturn-cli.ts"
+  },
+  "scripts": {
+    "start": "node --experimental-strip-types src/server/index.ts",
+    "cli": "node --experimental-strip-types src/tools/nocturn-cli.ts",
+    "test": "node --experimental-strip-types --test tests/engine.test.ts"
+  },
+  "engines": {
+    "node": ">=22.6.0"
+  }
+}
