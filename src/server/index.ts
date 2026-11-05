@@ -183,6 +183,11 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
     void runner.processPendingEffects();
   }
 
+  // Enable automatic sota execution for all newly created/dispatched tasks when running live server
+  if (dbPath !== ":memory:") {
+    runner.options.autoSpawnOnSota = true;
+  }
+
   async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(Buffer.from(chunk));

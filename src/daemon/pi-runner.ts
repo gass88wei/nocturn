@@ -9,6 +9,8 @@ export interface SotaPiRunnerOptions {
   sshPort?: number;
   sshControlSocket?: string;
   dryRun?: boolean;
+  /** When true, newly enqueued Runs automatically spawn Pi 1.5.0 on sota in the background */
+  autoSpawnOnSota?: boolean;
 }
 
 /**
@@ -28,6 +30,7 @@ export class SotaPiRunner {
         options.sshControlSocket ??
         "/Users/yangxin/Documents/ChatGPT/multica/.multica/sota-ssh.sock",
       dryRun: options.dryRun ?? false,
+      autoSpawnOnSota: options.autoSpawnOnSota ?? false,
     };
   }
 
@@ -98,15 +101,25 @@ export class SotaPiRunner {
 
     for (const eff of effects) {
       if (eff.kind === "launch_run") {
-        const { sessionId, piSessionId } = eff.payload as {
+        const { runId, sessionId, piSessionId, autoSpawn } = eff.payload as {
           runId: string;
           sessionId: string;
           piSessionId: string | null;
           worktreePath: string;
+          autoSpawn?: boolean;
         };
-        if (!piSessionId) {
-          this.engine.bindNativePiSessionId(sessionId, randomUUID());
+        let resolvedPiSessionId = piSessionId;
+        if (!resolvedPiSessionId) {
+          resolvedPiSessionId = randomUUID();
+          this.engine.bindNativePiSessionId(sessionId, resolvedPiSessionId);
         }
+        this.engine.store.markEffectDone(eff.id);
+        processed++;
+
+        if (!this.options.dryRun && (this.options.autoSpawnOnSota || autoSpawn)) {
+          void this.executeRunOnSota(runId);
+        }
+        continue;
       } else if (eff.kind === "wake_leader") {
         const { taskId, leaderAgentId, reason } = eff.payload as {
           taskId: string;
@@ -139,6 +152,35 @@ export class SotaPiRunner {
       processed++;
     }
     return processed;
+  }
+
+  /**
+   * Execute an active Run on `sota` using its assembled role-aware Briefing prompt.
+   */
+  async executeRunOnSota(runId: string): Promise<void> {
+    const run = this.engine.store.getRun(runId);
+    if (!run || run.status !== "running") return;
+    const session = this.engine.store.getSession(run.sessionId);
+    if (!session) return;
+    if (!session.piSessionId) {
+      this.engine.bindNativePiSessionId(session.id, randomUUID());
+    }
+    const refreshed = this.engine.store.getSession(session.id)!;
+    const prompt = this.buildBriefingForTaskAgent(run.taskId, run.agentId, run.summary);
+
+    try {
+      await this.runLiveOnSota({
+        runId: run.id,
+        worktreePath: refreshed.worktreePath,
+        piSessionId: refreshed.piSessionId!,
+        prompt,
+      });
+    } catch (err) {
+      this.engine.appendRunStep(run.id, {
+        badge: "步骤",
+        text: `[sota 执行异常] ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
   }
 
   /**

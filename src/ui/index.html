@@ -2418,6 +2418,13 @@
           badgeClass: "dispatch",
           links: [{ actorId: "dev-leader", type: "dispatching" }]
         });
+        if (location.protocol.startsWith("http")) {
+          fetch("/api/tasks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ identifier: newCode, title: `#${newCode.split("-")[1]} ${val}`, description: val, squadId: "dev" })
+          }).catch(() => {});
+        }
       }
 
       composerInput.value = "";
@@ -2432,15 +2439,125 @@
     document.getElementById("collapseSidebarBtn").addEventListener("click", toggleSidebar);
     document.getElementById("toggleSidebarRailBtn").addEventListener("click", toggleSidebar);
 
-    // 如果运行在本地 Nocturn Server (http://localhost:4100)，自动订阅 /api/events SSE 实时流并同步 SQLite 状态
+    // 如果运行在本地 Nocturn Server (http://localhost:4100)，自动订阅 /api/events SSE 实时流并把 SQLite 里的真实任务与步骤同步到界面
+    function applyBackendSnapshot(snap) {
+      if (!snap || !Array.isArray(snap.tasks)) return;
+      document.getElementById("peekHeaderSub").textContent = `SQLite 已同步 (${snap.tasks.length} 任务 · SSE 在线)`;
+
+      snap.tasks.forEach(t => {
+        let pill = pills.find(p => p.identifier === t.identifier);
+        const dotType = t.status === "dispatching" ? "dispatching" : (t.status === "in_review" ? "in_review" : "running");
+        const badgeText = t.pendingAttention
+          ? "❓ 待你拍板"
+          : t.status === "in_review"
+          ? "Verdict: ready"
+          : t.assignedWorkerId
+          ? `${t.assignedWorkerId} 工作中`
+          : "队长派单中";
+        const badgeClass = t.pendingAttention ? "attention" : (t.status === "in_review" ? "ready" : (t.assignedWorkerId ? "progress" : "dispatch"));
+        const links = [{ actorId: t.leaderAgentId, type: t.assignedWorkerId ? "waiting" : "dispatching" }];
+        if (t.assignedWorkerId) links.push({ actorId: t.assignedWorkerId, type: "running" });
+
+        if (!pill) {
+          pill = {
+            id: t.id,
+            squadId: t.squadId,
+            identifier: t.identifier,
+            status: t.status === "in_review" ? "待审核" : (t.status === "done" ? "已完成" : "进行中"),
+            dotType,
+            title: t.title,
+            badgeText,
+            badgeClass,
+            hasAttention: Boolean(t.pendingAttention),
+            links
+          };
+          pills.unshift(pill);
+        } else {
+          pill.status = t.status === "in_review" ? "待审核" : (t.status === "done" ? "已完成" : "进行中");
+          pill.dotType = dotType;
+          pill.badgeText = badgeText;
+          pill.badgeClass = badgeClass;
+          pill.hasAttention = Boolean(t.pendingAttention);
+          pill.links = links;
+        }
+
+        // 同步该任务在 SQLite 中的最新 Run 步骤到对应智能体的 Session 卡片
+        const taskRuns = (snap.runs || []).filter(r => r.taskId === t.id);
+        taskRuns.forEach(r => {
+          const found = findAgentById(r.agentId);
+          if (!found) return;
+          const mappedSteps = (r.steps || []).map(st => ({
+            badge: st.badge === "Input" ? "receipt" : (st.badge === "Report" ? "report" : (st.badge === "Handback" ? "handback" : (st.badge === "Note" ? "note" : "步骤"))),
+            text: st.text,
+            receiptState: st.receiptState || "read",
+            receiptLabel: st.receiptState === "delivered" ? "✓ 已送达进程 (delivered)" : "✓✓ 模型已读 (read)"
+          }));
+
+          if (found.agent.isLeader) {
+            let ls = found.agent.leaderSessions.find(x => x.taskCode === t.identifier);
+            if (!ls) {
+              ls = {
+                taskId: pill.id,
+                taskCode: t.identifier,
+                taskTitle: t.title,
+                time: r.status === "running" ? "正在运行" : "已完成",
+                active: r.status === "running",
+                verdictState: badgeClass,
+                verdictText: badgeText,
+                whatLeaderSaid: r.summary,
+                runTitle: `${found.agent.name} · 派单回合`,
+                runSummary: r.summary,
+                steps: mappedSteps
+              };
+              found.agent.leaderSessions.unshift(ls);
+            } else if (mappedSteps.length > ls.steps.length) {
+              ls.steps = mappedSteps;
+              ls.active = r.status === "running";
+              ls.runSummary = r.summary;
+            }
+          } else {
+            let ws = (found.agent.workerSessions || []).find(x => x.taskCode === t.identifier);
+            if (!ws) {
+              ws = {
+                runId: r.id,
+                taskId: pill.id,
+                taskCode: t.identifier,
+                taskTitle: t.title,
+                elapsed: "实时",
+                active: r.status === "running",
+                subscriptions: t.subscribedThreads || [`Issue #${t.identifier}`],
+                verdict: {
+                  state: t.latestVerdict?.state || "progress",
+                  label: `状态：${t.latestVerdict?.state || "progress"}`,
+                  summary: t.latestVerdict?.summary || r.summary
+                },
+                attention: t.pendingAttention,
+                currentThought: r.summary,
+                runSummary: r.summary,
+                steps: mappedSteps
+              };
+              found.agent.workerSessions.unshift(ws);
+            } else if (mappedSteps.length >= ws.steps.length) {
+              ws.runId = r.id,
+              ws.steps = mappedSteps;
+              ws.active = r.status === "running";
+              ws.runSummary = r.summary;
+              if (t.latestVerdict) {
+                ws.verdict.state = t.latestVerdict.state;
+                ws.verdict.summary = t.latestVerdict.summary;
+              }
+            }
+          }
+        });
+      });
+      syncUI();
+    }
+
     if (location.protocol.startsWith("http")) {
       const es = new EventSource("/api/events");
       es.onmessage = (ev) => {
         try {
-          const snap = JSON.parse(ev.data);
-          if (snap && Array.isArray(snap.tasks) && snap.tasks.length > 0) {
-            document.getElementById("peekHeaderSub").textContent = `SQLite 已同步 (${snap.tasks.length} 任务 · SSE 在线)`;
-          }
+          applyBackendSnapshot(JSON.parse(ev.data));
         } catch {}
       };
     }
