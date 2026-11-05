@@ -908,11 +908,11 @@
           <!-- 容器 3 (默认主视图展示！)：你的标志性「实时态势二部图 (Now)」 -->
           <div id="viewContainerNow" class="now-card" style="display:flex;">
             <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:#64748b;">
-              <span><strong>实时态势 (Now — 谁正在干什么)</strong> · 点击右侧任意 Issue 查看它的四棒进度线与产出源码</span>
+              <span><strong>实时态势 (Now)</strong> · 仅展示<strong>当前任务 / 活跃任务</strong>的接力连线（历史已结单任务自动归档至下方列表，绝不交叉缠绕）</span>
               <div style="display:flex;gap:14px;align-items:center;">
-                <span style="display:inline-flex;align-items:center;gap:5px;"><svg width="20" height="8"><line x1="1" y1="4" x2="19" y2="4" stroke="#7c3aed" stroke-width="2.5"/></svg>队长派单中</span>
-                <span style="display:inline-flex;align-items:center;gap:5px;"><svg width="20" height="8"><line x1="1" y1="4" x2="19" y2="4" stroke="#2563eb" stroke-width="2.5"/></svg>组员执行中</span>
-                <span style="display:inline-flex;align-items:center;gap:5px;"><svg width="20" height="8"><line x1="1" y1="4" x2="19" y2="4" stroke="#64748b" stroke-width="2" stroke-dasharray="3 3"/></svg>等待回调</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;"><svg width="20" height="8"><line x1="1" y1="4" x2="19" y2="4" stroke="#7c3aed" stroke-width="2.5"/></svg>① 队长拆单</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;"><svg width="20" height="8"><line x1="1" y1="4" x2="19" y2="4" stroke="#2563eb" stroke-width="2.5"/></svg>② 组员编码</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;"><svg width="20" height="8"><line x1="1" y1="4" x2="19" y2="4" stroke="#10b981" stroke-width="2.5"/></svg>③ 审查准出</span>
               </div>
             </div>
             <div class="bipartite-stage" id="bipartiteStage">
@@ -1587,10 +1587,27 @@
     function renderNowGraph(tasks) {
       const leftCol = document.getElementById("leftColumn");
       const rightCol = document.getElementById("rightColumn");
+      const currentTask = tasksData.find(x => x.id === selectedTaskId) || tasks[0] || tasksData[0];
+
+      // 找出当前选中任务参与过的智能体及其棒次，只高亮当前任务相关人员！
+      const activeActorStepMap = {};
+      if (currentTask) {
+        activeActorStepMap[currentTask.leaderAgentId || "dev-leader"] = "① 拆单";
+        const hasCoder = (currentTask.runs || []).some(r => r.agentId === "pi-coder") || currentTask.assignedWorkerId === "pi-coder";
+        const hasReviewer = (currentTask.runs || []).some(r => r.agentId === "codex-reviewer") || currentTask.assignedWorkerId === "codex-reviewer";
+        if (hasCoder) activeActorStepMap["pi-coder"] = "② 编码";
+        if (hasReviewer) activeActorStepMap["codex-reviewer"] = "③ 审查";
+        if (currentTask.assignedWorkerId && !activeActorStepMap[currentTask.assignedWorkerId]) {
+          activeActorStepMap[currentTask.assignedWorkerId] = "执行";
+        }
+      }
+
       leftCol.innerHTML = "";
       squads.forEach(s => {
         const pod = document.createElement("div");
+        const isCurrentSquad = !currentTask || currentTask.squadId === s.id;
         pod.className = "squad-pod";
+        if (!isCurrentSquad) pod.style.opacity = "0.4";
         pod.innerHTML = `
           <div class="squad-pod-header" onclick="setSidebarFilter('squad:${s.id}')">
             <span class="squad-pod-name"><span class="squad-pod-dot" style="background:${s.color}"></span>${s.name}</span>
@@ -1599,13 +1616,15 @@
         `;
         s.agents.forEach(a => {
           const node = document.createElement("div");
+          const stepBadge = activeActorStepMap[a.id];
           node.className = "actor-node" + (a.isLeader ? "" : " worker-indent");
+          if (!stepBadge && isCurrentSquad) node.style.opacity = "0.45";
           node.dataset.actorId = a.id;
           node.innerHTML = `
             <div class="actor-left">
               <div class="actor-avatar" style="background:${a.color}">${a.initials}</div>
               <div>
-                <div class="actor-name">${a.name}</div>
+                <div class="actor-name">${a.name} ${stepBadge ? `<span class="role-badge leader">${stepBadge}</span>` : ""}</div>
                 <div class="actor-sub">${a.sub}</div>
               </div>
             </div>
@@ -1617,14 +1636,21 @@
         leftCol.appendChild(pod);
       });
 
+      // 右列只放：【正在进行中 / 待审核的活跃任务】+【当前选中的这 1 个任务】
+      // 其他已经结单的“上个任务”放在下方列表里，不在二部图上堆叠乱画线！
+      const nowPills = tasks.filter(t => t.status !== "done" || t.id === selectedTaskId);
+      if (nowPills.length === 0 && currentTask) nowPills.push(currentTask);
+
       rightCol.innerHTML = "";
-      tasks.forEach(t => {
+      nowPills.forEach(t => {
+        const isSelected = t.id === selectedTaskId;
         const el = document.createElement("div");
-        el.className = "task-pill" + (t.id === selectedTaskId ? " selected-pill" : "");
+        el.className = "task-pill" + (isSelected ? " selected-pill" : "");
+        if (!isSelected) el.style.opacity = "0.65";
         el.dataset.pillId = t.id;
         const dotClass = t.status === "in_review" || t.status === "done" ? "in_review" : "running";
         const badgeClass = t.status === "in_review" || t.status === "done" ? "ready" : "progress";
-        const badgeText = t.status === "done" ? "✅ 已结单" : (t.status === "in_review" ? "⚠️ 待审核" : "执行中");
+        const badgeText = t.status === "done" ? "✅ 当前查看 (已结单)" : (t.status === "in_review" ? "⚠️ 待你审核" : "🟢 正在运行");
         el.innerHTML = `
           <div class="task-pill-left">
             <span class="task-dot ${dotClass}"></span>
@@ -1639,6 +1665,7 @@
       requestAnimationFrame(drawCurves);
     }
 
+    // 核心改进：只画【当前选中任务】这 1 个任务的接力连线（① 队长 ── ② Coder ── ③ Reviewer），绝不把上个任务和这个任务的线混在一起！
     function drawCurves() {
       if (surfaceMode !== "now") return;
       const stageEl = document.getElementById("bipartiteStage");
@@ -1663,26 +1690,64 @@
       svgEl.setAttribute("viewBox", `0 0 ${stageRect.width} ${stageRect.height}`);
       svgEl.innerHTML = "";
 
-      tasksData.forEach(t => {
-        const dst = pillAnchors[t.id];
-        if (!dst) return;
-        const links = [{ actorId: t.leaderAgentId, type: t.assignedWorkerId ? "waiting" : "dispatching" }];
-        if (t.assignedWorkerId) links.push({ actorId: t.assignedWorkerId, type: "running" });
-        links.forEach(l => {
-          const src = actorAnchors[l.actorId];
-          if (!src) return;
-          const span = dst.x - src.x;
-          const pathData = `M ${src.x} ${src.y} C ${src.x + span * 0.46} ${src.y}, ${dst.x - span * 0.46} ${dst.y}, ${dst.x} ${dst.y}`;
-          const color = l.type === "running" ? "#2563eb" : (l.type === "dispatching" ? "#7c3aed" : "#64748b");
-          const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          line.setAttribute("d", pathData);
-          line.setAttribute("fill", "none");
-          line.setAttribute("stroke", color);
-          line.setAttribute("stroke-width", l.type === "waiting" ? "1.3" : "2.1");
-          line.setAttribute("opacity", l.type === "waiting" ? "0.55" : "0.92");
-          if (l.type === "waiting") line.setAttribute("stroke-dasharray", "4 4");
-          svgEl.appendChild(line);
+      // 只为当前聚焦的这 1 个任务画接力线！
+      const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
+      if (!t) return;
+      const dst = pillAnchors[t.id];
+      if (!dst) return;
+
+      const links = [];
+      const leaderId = t.leaderAgentId || "dev-leader";
+      const hasCoder = (t.runs || []).some(r => r.agentId === "pi-coder") || t.assignedWorkerId === "pi-coder";
+      const hasReviewer = (t.runs || []).some(r => r.agentId === "codex-reviewer") || t.assignedWorkerId === "codex-reviewer";
+
+      links.push({
+        actorId: leaderId,
+        color: "#7c3aed",
+        dashed: Boolean(t.assignedWorkerId),
+        active: !t.assignedWorkerId
+      });
+      if (hasCoder) {
+        links.push({
+          actorId: "pi-coder",
+          color: "#2563eb",
+          dashed: t.assignedWorkerId === "codex-reviewer",
+          active: t.assignedWorkerId === "pi-coder"
         });
+      }
+      if (hasReviewer) {
+        links.push({
+          actorId: "codex-reviewer",
+          color: "#10b981",
+          dashed: false,
+          active: true
+        });
+      }
+
+      links.forEach(l => {
+        const src = actorAnchors[l.actorId];
+        if (!src) return;
+        const span = dst.x - src.x;
+        const pathData = `M ${src.x} ${src.y} C ${src.x + span * 0.46} ${src.y}, ${dst.x - span * 0.46} ${dst.y}, ${dst.x} ${dst.y}`;
+
+        if (l.active) {
+          const glow = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          glow.setAttribute("d", pathData);
+          glow.setAttribute("fill", "none");
+          glow.setAttribute("stroke", l.color);
+          glow.setAttribute("stroke-width", "6");
+          glow.setAttribute("opacity", "0.15");
+          svgEl.appendChild(glow);
+        }
+
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        line.setAttribute("d", pathData);
+        line.setAttribute("fill", "none");
+        line.setAttribute("stroke", l.color);
+        line.setAttribute("stroke-width", l.active ? "2.4" : "1.6");
+        line.setAttribute("opacity", l.dashed ? "0.6" : "0.95");
+        if (l.dashed) line.setAttribute("stroke-dasharray", "4 4");
+        svgEl.appendChild(line);
       });
     }
 
