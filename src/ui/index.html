@@ -1095,6 +1095,13 @@
     <!-- 3. 主画面：中间实时态势图 + 右侧提纯版 Session 抽屉 -->
     <main class="main-surface">
       <div class="now-stage-pane">
+        <!-- 顶部真实 sota 任务一键派发栏（直接连 http://127.0.0.1:4100 + 远端 sota Pi 1.5.0） -->
+        <div style="display:flex;align-items:center;gap:8px;background:#eef2ff;border:1.5px solid #818cf8;border-radius:12px;padding:8px 12px;">
+          <span style="font-size:11.5px;font-weight:700;color:#3730a3;white-space:nowrap;">🟢 sota 真机派单：</span>
+          <input id="quickTaskInput" style="flex:1;height:32px;border:1px solid #c7d2fe;border-radius:8px;padding:0 10px;font-size:12px;background:#fff;color:#1f2329;outline:none;" placeholder="输入一个真实需求（例如：写一个 string-utils.js 实现反转字符串与回文判断并通过单测），回车或点右侧按钮直接让 sota 自动跑完交付..." />
+          <button class="send-btn" style="height:32px;white-space:nowrap;padding:0 14px;" onclick="submitLiveTaskFromBar()">🚀 提交给 sota 自动派单交付</button>
+        </div>
+
         <!-- 顶部 4 张快捷体验卡：对应提纯后的 4 个核心机制 -->
         <div class="core-primitives-bar">
           <div class="primitive-chip-card" onclick="selectWorker('pi-coder', 0)">
@@ -1567,6 +1574,7 @@
     ];
 
     // 默认打开 pi-coder 的实时终端 Session，让你一眼看到 SuperAgent 的 Report + Attention(边问边干) + Handback + 两阶段回执！
+    const API_BASE = "http://127.0.0.1:4100";
     let drawerState = {
       mode: "worker",
       squadId: "dev",
@@ -1705,15 +1713,20 @@
         ws.active = true;
         ws.verdict.state = "progress";
         ws.verdict.label = "状态：progress (定向返工 Rework 唤醒原会话 ses_01k2)";
-        ws.verdict.summary = `收到人类验收驳回，已自动携带上次 PR #108 产物与驳回原因恢复原会话继续修改。`;
+        ws.verdict.summary = `收到人类验收驳回，已自动携带上次产物与驳回原因恢复原会话继续修改。`;
         ws.steps.push({
           badge: "receipt",
-          text: `↩️ [定向返工 Rework Context] 人类驳回原因：「${reason}」（已自动恢复原会话 ses_01k2）`,
+          text: `↩️ [定向返工 Rework Context] 人类驳回原因：「${reason}」（正在 sota 上恢复原会话继续执行...）`,
           receiptState: "read",
           receiptLabel: "✓✓ 模型已读 (read)"
         });
       }
-      selectWorker("codex-reviewer", 0);
+      fetch(API_BASE + "/api/rework", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: p.identifier, reviewer: "yangxin", reason })
+      }).catch(() => {});
+      selectTask(pillId);
     }
 
     function isActorHighlighted(actorId, squadId) {
@@ -2060,14 +2073,12 @@
       if (!p) return;
       p.status = p.status === "进行中" ? "待审核" : (p.status === "待审核" ? "已完成" : "进行中");
       p.dotType = p.status === "待审核" ? "in_review" : "running";
-      if (location.protocol.startsWith("http")) {
-        const apiStatus = p.status === "待审核" ? "in_review" : (p.status === "已完成" ? "done" : "in_progress");
-        fetch("/api/tasks/status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskId: p.identifier, status: apiStatus })
-        }).catch(() => {});
-      }
+      const apiStatus = p.status === "待审核" ? "in_review" : (p.status === "已完成" ? "done" : "in_progress");
+      fetch(API_BASE + "/api/tasks/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: p.identifier, status: apiStatus })
+      }).catch(() => {});
       syncUI();
     }
 
@@ -2080,8 +2091,8 @@
         ws.runSummary = "已终止远端 sota Pi 进程";
         ws.steps.push({ badge: "步骤", text: "[已停止] 已向 sota 发送 SIGTERM 终止当前运行回合" });
       }
-      if (location.protocol.startsWith("http") && runId) {
-        fetch("/api/runs/stop", {
+      if (runId) {
+        fetch(API_BASE + "/api/runs/stop", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ runId, reason: `用户手动停止 ${taskCode}` })
@@ -2104,7 +2115,7 @@
         name: name || id,
         role: "组员",
         isLeader: false,
-        sub: "Pi 1.5.0 · 待命",
+        sub: "deepseek-flash · 待命",
         color: "#0284c7",
         initials: (name || id).slice(0, 2).toUpperCase(),
         dotType: "blue",
@@ -2125,14 +2136,64 @@
         ]
       });
 
-      if (location.protocol.startsWith("http")) {
-        fetch("/api/agents", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, name, squadId: "dev", role: "worker", cli: "pi", skills, instructions })
-        }).catch(() => {});
-      }
+      fetch(API_BASE + "/api/agents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, name, squadId: "dev", role: "worker", cli: "pi", skills, instructions })
+      }).catch(() => {});
       selectWorker(id, 0);
+    }
+
+    // 顶部一键提交真实任务给 sota 自动派单交付
+    function submitLiveTaskFromBar() {
+      const inp = document.getElementById("quickTaskInput");
+      const val = (inp.value || "").trim();
+      if (!val) {
+        inp.focus();
+        return;
+      }
+      const num = 439 + pills.length;
+      const newCode = "TASK-" + num;
+      const newPillId = "p_" + Date.now();
+      pills.unshift({
+        id: newPillId,
+        squadId: "dev",
+        identifier: newCode,
+        status: "进行中",
+        dotType: "dispatching",
+        title: `#${num} ${val}`,
+        badgeText: "sota 队长派单中...",
+        badgeClass: "dispatch",
+        links: [{ actorId: "dev-leader", type: "dispatching" }]
+      });
+      squads[0].agents[0].leaderSessions.unshift({
+        taskId: newPillId,
+        taskCode: newCode,
+        taskTitle: `#${num} ${val}`,
+        time: "正在 sota 上运行...",
+        active: true,
+        verdictState: "dispatch",
+        verdictText: "正在唤醒 sota 上的研发队长...",
+        whatLeaderSaid: `正在 sota 上通过 gemini-4-argon-high 评估任务「${val}」并自动调用 nocturn dispatch 派给组员执行...`,
+        runTitle: "研发小队队长 · sota 真机派单回合",
+        runSummary: "正在连接 sota 执行派单...",
+        steps: [{ badge: "步骤", text: `🚀 [已提交至 127.0.0.1:4100] 正在拉起 sota 研发小队队长处理 ${newCode}...` }]
+      });
+      inp.value = "";
+      selectTask(newPillId);
+
+      fetch(API_BASE + "/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: newCode,
+          title: `#${num} ${val}`,
+          description: `${val}（请研发队长调用 nocturn dispatch 委派给 pi-coder 实现并验证，完成后调用 nocturn report --state ready 汇报交付）`,
+          squadId: "dev"
+        })
+      }).catch(err => {
+        alert("连接本地 127.0.0.1:4100 失败：" + err.message);
+      });
     }
 
     // 一键在远端 sota 上真实跑一轮 Pi 1.5.0 并实时流式回显步骤
@@ -2148,18 +2209,17 @@
           ws.steps.push({ badge: "步骤", text: `🚀 [正在连接 sota] 正在拉起远端 Pi 1.5.0 进程执行 ${taskCode}...` });
           syncUI();
         }
+      } else if (drawerState.mode === "task") {
+        const p = pills.find(x => x.id === drawerState.taskId);
+        if (p) taskCode = p.identifier;
       }
-      if (!location.protocol.startsWith("http")) {
-        alert("当前为离线画布预览；访问 http://localhost:4100 点击此按钮将直接通过 SSH 控制套接字在 sota 上拉起真实 Pi 1.5.0 进程！");
-        return;
-      }
-      fetch("/api/sota/exec", {
+      fetch(API_BASE + "/api/sota/exec", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           taskId: taskCode,
           agentId,
-          prompt: `你是 ${targetName}，正在处理任务 ${taskCode}。请用一句话汇报你当前在 sota 工作区 (${taskCode}) 的就绪状态，不要调耗时工具。`
+          prompt: `你是 ${targetName}，正在处理任务 ${taskCode}。请用一句话汇报你当前在 sota 工作区 (${taskCode}) 的文件列表与就绪状态。`
         })
       })
         .then(r => r.json())
@@ -2170,7 +2230,7 @@
             if (ws) {
               ws.steps.push({
                 badge: "步骤",
-                text: `🟢 [sota Pi 1.5.0 真实执行完成 · 会话 ${data.piSessionId.slice(0, 8)}] ${data.sotaReply}`
+                text: `🟢 [sota Pi 1.5.0 (${data.model || 'flash'}) 回复 · 会话 ${data.piSessionId.slice(0, 8)}] ${data.sotaReply}`
               });
               syncUI();
             }
@@ -2403,27 +2463,25 @@
               syncUI();
             }, 1000);
 
-            // 如果连接了本地 Nocturn Server (/api/sota/exec)，同时在远端 sota Pi 1.5.0 真实执行该轮插话并回显结果
-            if (location.protocol.startsWith("http")) {
-              fetch("/api/sota/exec", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ taskId: ws.taskCode, agentId: found.agent.id, prompt: val })
+            // 直接通过 API_BASE (http://127.0.0.1:4100/api/sota/exec) 在远端 sota Pi 1.5.0 真实执行该轮插话并回显结果
+            fetch(API_BASE + "/api/sota/exec", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ taskId: ws.taskCode, agentId: found.agent.id, prompt: val })
+            })
+              .then(r => r.ok ? r.json() : null)
+              .then(data => {
+                if (data && data.sotaReply) {
+                  newReceipt.receiptState = "read";
+                  newReceipt.receiptLabel = "✓✓ sota Pi 1.5.0 已读";
+                  ws.steps.push({
+                    badge: "步骤",
+                    text: `[sota Pi 1.5.0 真实回复 (${data.piSessionId.slice(0, 8)})] ${data.sotaReply}`
+                  });
+                  syncUI();
+                }
               })
-                .then(r => r.ok ? r.json() : null)
-                .then(data => {
-                  if (data && data.sotaReply) {
-                    newReceipt.receiptState = "read";
-                    newReceipt.receiptLabel = "✓✓ sota Pi 1.5.0 已读";
-                    ws.steps.push({
-                      badge: "步骤",
-                      text: `[sota Pi 1.5.0 真实回复 (${data.piSessionId.slice(0, 8)})] ${data.sotaReply}`
-                    });
-                    syncUI();
-                  }
-                })
-                .catch(() => {});
-            }
+              .catch(() => {});
           }
         }
       } else if (drawerState.mode === "leader") {
@@ -2456,13 +2514,11 @@
           badgeClass: "dispatch",
           links: [{ actorId: "dev-leader", type: "dispatching" }]
         });
-        if (location.protocol.startsWith("http")) {
-          fetch("/api/tasks", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ identifier: newCode, title: `#${newCode.split("-")[1]} ${val}`, description: val, squadId: "dev" })
-          }).catch(() => {});
-        }
+        fetch(API_BASE + "/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identifier: newCode, title: `#${newCode.split("-")[1]} ${val}`, description: val, squadId: "dev" })
+        }).catch(() => {});
       }
 
       composerInput.value = "";
@@ -2548,7 +2604,7 @@
                 steps: mappedSteps
               };
               found.agent.leaderSessions.unshift(ls);
-            } else if (mappedSteps.length > ls.steps.length) {
+            } else {
               ls.steps = mappedSteps;
               ls.active = r.status === "running";
               ls.runSummary = r.summary;
@@ -2575,13 +2631,14 @@
                 steps: mappedSteps
               };
               found.agent.workerSessions.unshift(ws);
-            } else if (mappedSteps.length >= ws.steps.length) {
-              ws.runId = r.id,
+            } else {
+              ws.runId = r.id;
               ws.steps = mappedSteps;
               ws.active = r.status === "running";
               ws.runSummary = r.summary;
               if (t.latestVerdict) {
                 ws.verdict.state = t.latestVerdict.state;
+                ws.verdict.label = `准出裁定 Verdict：${t.latestVerdict.state}`;
                 ws.verdict.summary = t.latestVerdict.summary;
               }
             }
@@ -2591,14 +2648,18 @@
       syncUI();
     }
 
-    if (location.protocol.startsWith("http")) {
-      const es = new EventSource("/api/events");
+    document.getElementById("quickTaskInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submitLiveTaskFromBar();
+    });
+
+    try {
+      const es = new EventSource(API_BASE + "/api/events");
       es.onmessage = (ev) => {
         try {
           applyBackendSnapshot(JSON.parse(ev.data));
         } catch {}
       };
-    }
+    } catch {}
 
     window.addEventListener("resize", () => requestAnimationFrame(drawCurves));
     syncUI();
