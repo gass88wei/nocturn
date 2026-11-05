@@ -387,6 +387,32 @@
     .verdict-mini-badge.ready { background: #d1fae5; color: #047857; }
     .verdict-mini-badge.dispatch { background: #ede9fe; color: #6d28d9; }
 
+    .issue-bind-chip {
+      font-size: 9.5px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px dashed #94a3b8;
+      color: #475569;
+      background: #f8fafc;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .issue-bind-chip:hover {
+      border-color: #4f46e5;
+      color: #4f46e5;
+      background: #eef2ff;
+    }
+    .issue-bind-chip.bound {
+      border-style: solid;
+      border-color: #c7d2fe;
+      background: #eef2ff;
+      color: #4338ca;
+    }
+
     .curves-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
 
     /* ============================================================================
@@ -767,9 +793,10 @@
     <!-- 3. 主面板区域（中间：实时态势二部图 / 任务列表 Issues + 右侧：紧凑型抽屉） -->
     <main class="main-surface">
       <div class="center-stage-pane">
-        <!-- 顶部真实 sota 派单栏 -->
+        <!-- 顶部真实 sota 派单栏（支持同时填写或绑定 Issue） -->
         <div class="dispatch-bar">
-          <span style="font-size:11.5px;font-weight:700;color:#3730a3;white-space:nowrap;">🟢 新建任务 (Issue)：</span>
+          <span style="font-size:11.5px;font-weight:700;color:#3730a3;white-space:nowrap;">🟢 派单：</span>
+          <input id="quickIssueBindInput" style="max-width:135px;flex:none;" placeholder="🔗 绑定 Issue (如 #12)" title="可选：输入要绑定的 GitHub Issue 编号或仓库#编号" />
           <input id="quickTaskInput" placeholder="输入需求（如：写一个 string-utils.js 实现反转字符串并通过单测），回车直接派给 sota 团队执行..." />
           <button class="send-btn" style="height:30px;white-space:nowrap;" onclick="submitLiveTaskFromBar()">🚀 派单给 sota</button>
         </div>
@@ -888,6 +915,7 @@
       {
         id: "task_445",
         identifier: "TASK-445",
+        boundIssue: "nocturn#445",
         title: "#445 画个鹈鹕骑自行车的s v g",
         squadId: "dev",
         status: "in_review",
@@ -898,6 +926,7 @@
           state: "ready",
           summary: "已在 sota:/root/code/worktrees/task-445-pi-coder/pelican-bicycle.svg 完成绘制并通过渲染验证（18.8 KB）。"
         },
+        leaderNote: "已调用 nocturn dispatch 委派给 @pi-coder 绘制 pelican-bicycle.svg 并验证 XML/渲染合法性。",
         steps: [
           { badge: "步骤", text: "dev-leader (gemini-4-argon-high) 派单 -> pi-coder (deepseek-v4.1-flash)" },
           { badge: "步骤", text: "write: /root/code/worktrees/task-445-pi-coder/pelican-bicycle.svg (18,853B)" },
@@ -908,6 +937,7 @@
       {
         id: "task_438",
         identifier: "TASK-438",
+        boundIssue: "nocturn#438",
         title: "#438 编写 calc.js 斐波那契与四则运算模块并通过单测",
         squadId: "dev",
         status: "in_review",
@@ -917,6 +947,7 @@
           state: "ready",
           summary: "已实现 calc.js (add/multiply/fib) 与 calc.test.js，执行 node calc.test.js：23 项断言全部通过。"
         },
+        leaderNote: "已调用 nocturn dispatch 委派给 @pi-coder 实现 calc.js 算术与斐波那契模块并运行单测。",
         steps: [
           { badge: "步骤", text: "dev-leader 派单 -> pi-coder (/root/code/worktrees/task-438-pi-coder)" },
           { badge: "步骤", text: "write: calc.js (1093B) & calc.test.js (3118B)" },
@@ -927,6 +958,7 @@
     ];
 
     let centerTab = "now"; // 'now' | 'issues'
+    let drawerViewMode = "task"; // 'task' | 'leader' | 'worker'
     let issueFilter = "all";
     let selectedTaskId = "task_445";
     let selectedActorId = null;
@@ -975,15 +1007,18 @@
 
     function selectSquadLeader(squadId) {
       selectedSquadId = squadId;
-      selectedActorId = null;
+      selectedActorId = squads.find(s => s.id === squadId)?.leaderId || "dev-leader";
+      drawerViewMode = "leader";
       const firstSquadTask = tasksData.find(t => t.squadId === squadId);
       if (firstSquadTask) selectedTaskId = firstSquadTask.id;
       syncUI();
     }
 
     function selectWorker(workerId) {
+      const isLeader = squads.some(s => s.leaderId === workerId);
       selectedActorId = workerId;
       selectedSquadId = null;
+      drawerViewMode = isLeader ? "leader" : "worker";
       const workerTask = tasksData.find(t => t.assignedWorkerId === workerId || t.leaderAgentId === workerId);
       if (workerTask) selectedTaskId = workerTask.id;
       syncUI();
@@ -993,6 +1028,28 @@
       selectedTaskId = taskId;
       selectedActorId = null;
       selectedSquadId = null;
+      drawerViewMode = "task";
+      syncUI();
+    }
+
+    // 在任务胶囊旁边直接点击绑定/修改关联的 Issue（如 GitHub Issue #12 或 nocturn#445）
+    function promptBindIssue(taskId, ev) {
+      if (ev) ev.stopPropagation();
+      const t = tasksData.find(x => x.id === taskId);
+      if (!t) return;
+      const val = prompt(
+        `为任务 ${t.identifier} 绑定外部或仓库 Issue（例如 poijygfdyy/nocturn#12 或 #445，绑定后该 Issue 的评论与 CI 将通过绿色通道直达执行组员 Session）：`,
+        t.boundIssue || `nocturn#${t.identifier.replace("TASK-", "")}`
+      );
+      if (val === null) return;
+      t.boundIssue = val.trim();
+      selectedTaskId = t.id;
+      drawerViewMode = "task";
+      fetch(`${API_BASE}/api/tasks/bind-issue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: t.identifier, issueRef: t.boundIssue })
+      }).catch(() => {});
       syncUI();
     }
 
@@ -1073,7 +1130,7 @@
       }).join("");
     }
 
-    // 渲染右侧紧凑型抽屉（只留：状态栏 + 结果摘要/SVG预览 + 折叠式单行步骤流）
+    // 渲染右侧紧凑型抽屉（支持 3 种紧凑视角：1. 队长调度 Session / 2. 组员终端 Session / 3. 任务与绑定 Issue 详情）
     function renderCompactDrawer() {
       const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
       if (!t) {
@@ -1082,7 +1139,86 @@
       }
 
       const owner = t.assignedWorkerId || t.leaderAgentId || "pi-coder";
-      peekModeBadge.textContent = `${t.identifier} · @${owner}`;
+
+      // 视角 1：点击了左侧【队长】或【小队】 -> 紧凑展示队长自己的调度 Session
+      if (drawerViewMode === "leader") {
+        const s = squads.find(x => x.id === (selectedSquadId || t.squadId)) || squads[0];
+        const leader = s.agents[0];
+        const squadTasks = tasksData.filter(x => x.squadId === s.id);
+        peekModeBadge.textContent = `👑 ${leader.name} · 调度 Session`;
+        document.getElementById("triggerChipLabel").textContent = `⚡ 对 ${leader.name} 插话`;
+
+        peekPropsBar.innerHTML = s.agents.map(a => `
+          <div class="prop-pill ${a.id === leader.id ? 'active-tab' : ''}" onclick="selectWorker('${a.id}')">
+            ${a.isLeader ? '👑' : '🟢'} ${a.name}
+          </div>
+        `).join("");
+
+        peekScrollEl.innerHTML = squadTasks.map(st => `
+          <div class="verdict-box progress" style="cursor:pointer;" onclick="selectTask('${st.id}')">
+            <div class="verdict-header">
+              <span>${st.identifier} · ${st.boundIssue ? '🔗 ' + st.boundIssue : '未绑 Issue'}</span>
+              <span>派给 @${st.assignedWorkerId || '待定'} ›</span>
+            </div>
+            <div style="font-weight:600;color:#111827;margin-bottom:3px;">${st.title}</div>
+            <div class="verdict-summary">${st.leaderNote || `已调用 nocturn dispatch 派给 @${st.assignedWorkerId}，当前状态：${st.status}`}</div>
+          </div>
+        `).join("");
+        return;
+      }
+
+      // 视角 2：点击了左侧【执行组员 (如 pi-coder)】 -> 紧凑展示该组员的个人终端 Session
+      if (drawerViewMode === "worker" && selectedActorId) {
+        const myTasks = tasksData.filter(x => x.assignedWorkerId === selectedActorId);
+        const curTask = myTasks.find(x => x.id === selectedTaskId) || myTasks[0] || t;
+        peekModeBadge.textContent = `⚡ ${selectedActorId} · 终端 Session`;
+        document.getElementById("triggerChipLabel").textContent = `⚡ 对 ${selectedActorId} 插话`;
+
+        peekPropsBar.innerHTML = `
+          <div class="prop-pill" onclick="selectSquadLeader('${curTask.squadId}')">← 👑 队长</div>
+          ${myTasks.map(mt => `
+            <div class="prop-pill ${mt.id === curTask.id ? 'active-tab' : ''}" onclick="selectedTaskId='${mt.id}';syncUI();">
+              ${mt.status === 'in_review' ? '✅' : '🟢'} ${mt.identifier}
+            </div>
+          `).join("")}
+        `;
+
+        const rawSteps = (curTask.steps || []).filter(s => !String(s.text).startsWith("[sota Pi 1.5.0 回复] I'll start by inspecting"));
+        const stepsHtml = rawSteps.slice(-12).map(st => {
+          const clean = compactSingleLine(st.text);
+          const isReport = st.badge === "Report" || st.badge === "report";
+          return `
+            <div class="compact-step-row" title="${String(st.text).replace(/"/g, '&quot;')}">
+              <span class="compact-step-badge ${isReport ? 'report' : ''}">${isReport ? '结论' : '终端'}</span>
+              <span class="compact-step-text">${clean}</span>
+            </div>
+          `;
+        }).join("");
+
+        peekScrollEl.innerHTML = `
+          <h3 class="peek-issue-title">${curTask.title}</h3>
+          <div class="verdict-box ${curTask.latestVerdict?.state || 'progress'}">
+            <div class="verdict-header">
+              <span>当前进展 (${curTask.status})</span>
+              <span style="cursor:pointer;color:#4f46e5;" onclick="promptBindIssue('${curTask.id}', event)">🔗 ${curTask.boundIssue || '绑定 Issue'}</span>
+            </div>
+            <div class="verdict-summary">${curTask.latestVerdict?.summary || '正在 sota 工作区执行...'}</div>
+          </div>
+          <div class="compact-run-box">
+            <div class="compact-run-header" onclick="stepsExpanded = !stepsExpanded; renderCompactDrawer();">
+              <span>⚡ ${selectedActorId} 实时步骤 (${rawSteps.length} 步)</span>
+              <span style="color:#64748b;font-size:10px;">${stepsExpanded ? '收起 ▲' : '展开 ▼'}</span>
+            </div>
+            <div class="compact-steps-list" style="display:${stepsExpanded ? 'flex' : 'none'}">
+              ${stepsHtml}
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // 视角 3：点击了右侧【任务胶囊】或【🔗 绑定 Issue】 -> 展示 Issue 绑定与交付详情
+      peekModeBadge.textContent = `📋 ${t.identifier} · Issue 详情`;
       document.getElementById("triggerChipLabel").textContent = `⚡ 对 ${owner} 插话`;
 
       const statusLabel = t.status === "in_review" ? "待审核" : (t.status === "done" ? "已完成" : "进行中");
@@ -1093,23 +1229,24 @@
           <span class="task-dot ${dotClass}"></span>
           <span>${statusLabel} ▾</span>
         </div>
-        <div class="prop-pill" onclick="triggerTargetedRework('${t.id}')">↩️ 驳回返工</div>
+        <div class="prop-pill" style="border-color:#c7d2fe;background:#eef2ff;color:#4338ca;" onclick="promptBindIssue('${t.id}', event)" title="点击绑定或修改关联的 GitHub Issue">
+          <span>🔗 ${t.boundIssue ? '已绑 ' + t.boundIssue : '+ 绑定 Issue'}</span>
+        </div>
+        <div class="prop-pill" onclick="triggerTargetedRework('${t.id}')">↩️ 返工</div>
         <div class="prop-pill" style="margin-left:auto;color:#dc2626;" onclick="deleteTask('${t.id}', '${t.identifier}', event)">删除</div>
       `;
 
-      // SVG 产物紧凑预览（针对 #445 鹈鹕骑自行车 SVG）
       const svgPreviewHtml = (t.identifier === "TASK-445" || t.hasSvgPreview) ? `
         <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#f8fafc;">
-          <img src="${API_BASE}/api/pelican.svg" style="width:100%;max-height:155px;object-fit:contain;display:block;" alt="SVG Preview" onerror="this.parentElement.style.display='none'"/>
+          <img src="${API_BASE}/api/pelican.svg" style="width:100%;max-height:150px;object-fit:contain;display:block;" alt="SVG Preview" onerror="this.parentElement.style.display='none'"/>
         </div>
       ` : "";
 
       const vState = t.latestVerdict?.state || (t.status === "in_review" ? "ready" : "progress");
       const vSummary = t.latestVerdict?.summary || "正在 sota 工作区执行中...";
 
-      // 只取最近 12 条有效步骤，且每条严格压缩为单行！过滤掉重复啰嗦的中间文本
       const rawSteps = (t.steps || []).filter(s => !String(s.text).startsWith("[sota Pi 1.5.0 回复] I'll start by inspecting"));
-      const recentSteps = rawSteps.slice(-12);
+      const recentSteps = rawSteps.slice(-10);
       const stepsHtml = recentSteps.map(st => {
         const clean = compactSingleLine(st.text);
         const isReport = st.badge === "Report" || st.badge === "report";
@@ -1129,14 +1266,14 @@
         <div class="verdict-box ${vState}">
           <div class="verdict-header">
             <span>准出结果 (Verdict: ${vState})</span>
-            <span>@${owner}</span>
+            <span style="cursor:pointer;color:#2563eb;" onclick="selectWorker('${owner}')">执行人: @${owner} ›</span>
           </div>
           <div class="verdict-summary" title="${vSummary.replace(/"/g, '&quot;')}">${vSummary}</div>
         </div>
 
         <div class="compact-run-box">
           <div class="compact-run-header" onclick="stepsExpanded = !stepsExpanded; renderCompactDrawer();">
-            <span>⚡ sota Session 步骤记录 (${rawSteps.length} 步)</span>
+            <span>⚡ Session 步骤记录 (${rawSteps.length} 步)</span>
             <span style="color:#64748b;font-size:10px;">${stepsExpanded ? '收起 ▲' : '展开 ▼'}</span>
           </div>
           <div class="compact-steps-list" style="display:${stepsExpanded ? 'flex' : 'none'}">
@@ -1175,6 +1312,7 @@
 
     function submitLiveTaskFromBar() {
       const inp = document.getElementById("quickTaskInput");
+      const bindInp = document.getElementById("quickIssueBindInput");
       const val = (inp.value || "").trim();
       if (!val) {
         inp.focus();
@@ -1182,20 +1320,24 @@
       }
       const num = 446 + tasksData.length;
       const newCode = "TASK-" + num;
+      const boundIssue = (bindInp.value || "").trim() || `nocturn#${num}`;
       const newTask = {
         id: "task_" + Date.now(),
         identifier: newCode,
+        boundIssue,
         title: `#${num} ${val}`,
         squadId: "dev",
         status: "dispatching",
         leaderAgentId: "dev-leader",
         assignedWorkerId: null,
         latestVerdict: { state: "progress", summary: "正在唤醒 sota 上的研发队长派单..." },
-        steps: [{ badge: "步骤", text: `已提交 ${newCode}，正在 sota 上拉起研发队长...` }]
+        steps: [{ badge: "步骤", text: `已提交 ${newCode} (绑定 ${boundIssue})，正在 sota 上拉起研发队长...` }]
       };
       tasksData.unshift(newTask);
       selectedTaskId = newTask.id;
+      drawerViewMode = "task";
       inp.value = "";
+      bindInp.value = "";
       syncUI();
 
       fetch(`${API_BASE}/api/tasks`, {
@@ -1204,9 +1346,15 @@
         body: JSON.stringify({
           identifier: newCode,
           title: `#${num} ${val}`,
-          description: `${val}（请研发队长调用 nocturn dispatch 委派给 pi-coder 实现并验证，完成后立即调用 nocturn report --state ready 交付）`,
+          description: `${val}（关联 Issue: ${boundIssue}。请研发队长调用 nocturn dispatch 委派给 pi-coder 实现并验证，完成后立即调用 nocturn report --state ready 交付）`,
           squadId: "dev"
         })
+      }).then(() => {
+        fetch(`${API_BASE}/api/tasks/bind-issue`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId: newCode, issueRef: boundIssue })
+        }).catch(() => {});
       }).catch(() => {});
     }
 
@@ -1322,12 +1470,14 @@
         const dotClass = t.status === "in_review" ? "in_review" : (t.status === "dispatching" ? "dispatching" : "running");
         const badgeClass = t.status === "in_review" || t.status === "done" ? "ready" : (t.status === "dispatching" ? "dispatch" : "progress");
         const badgeText = t.status === "in_review" ? "待审核 (ready)" : (t.status === "done" ? "已完成" : (t.assignedWorkerId ? `${t.assignedWorkerId} 执行中` : "队长派单中"));
+        const issueLabel = t.boundIssue ? `🔗 ${t.boundIssue}` : `+ 绑定 Issue`;
 
         el.innerHTML = `
           <div class="task-pill-left">
             <span class="task-dot ${dotClass}"></span>
             <span class="task-title">${t.title}</span>
           </div>
+          <span class="issue-bind-chip ${t.boundIssue ? 'bound' : ''}" onclick="promptBindIssue('${t.id}', event)" title="点击绑定或修改关联的 GitHub Issue">${issueLabel}</span>
           <span class="verdict-mini-badge ${badgeClass}">${badgeText}</span>
         `;
         el.addEventListener("mouseenter", () => { hoveredPillId = t.id; drawCurves(); });
@@ -1448,6 +1598,7 @@
         return {
           id: t.id,
           identifier: t.identifier,
+          boundIssue: t.boundIssue || `nocturn#${t.identifier.replace("TASK-", "")}`,
           title: t.title,
           squadId: t.squadId || "dev",
           status: t.status,

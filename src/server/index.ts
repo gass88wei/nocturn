@@ -238,6 +238,23 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/api/tasks/bind-issue") {
+        const body = await readJsonBody(req);
+        const task = store.getTask(String(body.taskId));
+        if (!task) throw new Error("Task not found");
+        const issueRef = String(body.issueRef ?? "").trim();
+        (task as unknown as { boundIssue?: string }).boundIssue = issueRef;
+        const threadKey = `github:issue:${issueRef}`;
+        if (issueRef && !task.subscribedThreads.includes(threadKey)) {
+          task.subscribedThreads.push(threadKey);
+        }
+        task.updatedAt = new Date().toISOString();
+        store.saveTask(task);
+        engine.notifyChange();
+        sendJson(res, 200, task);
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/cli") {
         const body = await readJsonBody(req);
         const cmd = String(body.command) as NocturnCliCommand;
