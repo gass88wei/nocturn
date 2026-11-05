@@ -1,119 +1,65 @@
 # Nocturn
 
-> **Sleepless Multi-Agent Control Plane & Loop Engineering Runtime.**  
-> 当你合上电脑，你的 AI 研发军团仍在夜里持续拆单、编码、自测、自愈与交付。
-
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Architecture: Coordinator-Worker](https://img.shields.io/badge/Architecture-Dual--Layer%20%2B%20Green--Channel-purple.svg)](#核心架构设计)
-[![Runtime: 24/7 Server Daemon](https://img.shields.io/badge/Runtime-7%C3%9724h%20Remote%20Daemon-success.svg)](#全天候远端部署模型)
+> **一个面向长程任务的极简多 Agent 协作与调度平台（Persistent Multi-Agent Orchestration & Harness Platform）。**
+> 提纯融合自 **Multica**（长期 Agent 身份与跨周期 Session 底座）、**腾讯 TEG Loop Engineering**（结构化 Verdict 准出与带上下文定向返工）、以及 **DeepSeek SuperAgent (`dsh-superagent-prototype`)**（`report` 边提问边执行、Subscription 绿色通道直达与 `handback` 越界退回、`delivered → read` 两阶段防丢回执、单 SQLite + Effects 事务队列）。
 
 ---
 
-## 为什么做 Nocturn？
+## 1. 为什么做 Nocturn？（核心设计取舍）
 
-Coding Agent（如 Claude Code、Codex、Pi）的单点执行能力已经非常强，但在真实工程交付中，个人与团队依然困在三个结构性瓶颈里：
+原版 Multica 拥有近 **66.6 万行代码**（包含大量多租户 RBAC、云计费、6 种 IM 机器人与重型看板 CRUD）；而传统 Subagent 框架又只围绕单次主进程生命周期运转，进程退出即丢失协作关系。
 
-1. **「人下班，Agent 也下班」（高达 80%+ 的 Agent Idle 闲置率）**  
-   旧模式下，Agent 的启动、上下文转述、步骤衔接、报错重跑全部依赖人的在线状态。你同时开三个终端窗口，看似多了三个 AI 同事，实则自己变成了全天候人工调度员。
-2. **单 Session 漂移 vs 多层传话损耗**  
-   把所有工作塞进同一个长 Session，经过多次上下文压缩（Compact）后会产生严重漂移，且「既当运动员又当裁判」会带来强烈偏见；但若盲目模仿人类组织建多层审批 Agent，又会在层层自然语言转述中丢失关键代码上下文、烧光 Token。
-3. **自然语言交接脆弱 & 半夜无人盯屏时「静默卡死」**  
-   Agent 回复一句散装的自然语言“改好了”不代表业务真正可交付（`Agent Completed ≠ Business Completed`）；而在凌晨 3 点无人值守时，最怕的不是报错，而是 CLI 进程假死、Runtime 掉线导致整条链路静默停摆。
+**Nocturn** 将代码体量压缩了 **99.4%**（核心后端仅 **~1,350 行零外部依赖 TypeScript**），只保留真正决定长程多 Agent 协作质量的硬核机制：
 
-**Nocturn** 的目标不是训练另一个单点 Agent，而是构建一套 **从 Prompt Engineering 走向 Loop Engineering（工作循环工程）** 的控制面：用**严格两层架构**消除传话损耗，用**结构化准出与定向返工**保障交付质量，用**后台巡检自愈**兑现 7×24 小时无人值守运转。
+| 维度 | 借鉴来源 | Nocturn 的提纯实现 | 砍掉的冗余包袱 |
+| --- | --- | --- | --- |
+| **三层生命周期分离** | Multica + 自研状态机 | 严格分离 **`Task`（长期目标）** ↔ **`Session`（`(agentId, taskId)` 绑定的远端 `sota` Worktree 与原生 `piSessionId`）** ↔ **`Run`（单次 CLI 进程执行，跑完即退）** | 砍掉多租户权限、席位计费、复杂的自定义看板字段 |
+| **结构化 Verdict 与边问边干** | 腾讯知乎文 + SuperAgent `orchestrator_report` | Worker 通过 `nocturn report` 上报结构化 `state (progress/ready/blocked/failed)` + `summary` + `human_action`（抛出待人类拍板问题的同时可保持 `progress` 继续干确定性的活）+ `pr_number`（自动建立 PR 线程订阅） | 砍掉重型 6 节点固定 Workflow Template、自由 DAG 画布与 Temporal 引擎 |
+| **绿色通道直达与越界退回** | SuperAgent `Subscription` + `handback` | 命中已订阅 Issue/PR 的后续评论与 CI 事件直接扇出给原 Worker Session（免唤醒队长）；若评论超出当前任务范围，Worker 调 `nocturn handback` 退回给队长另建新任务 | 砍掉 SuperAgent 针对公共飞书群设计的复杂 `Gate / Mandate / PolicyVersion` 权限推理矩阵 |
+| **两阶段输入回执 (`delivered` vs `read`)** | SuperAgent `inputsDelivered` / `inputsRead` | 人类发出的实时插话（`--steer`）先记为 `delivered`（已送达进程），待模型完成当前回合后才升为 `read`。若进程在 `delivered` 期间崩溃或重启，恢复时自动重放所有未 `read` 的插话，绝不丢消息 | 砍掉外部消息队列依赖 |
+| **单文件 SQLite + Effects 队列** | SuperAgent `Store` + `Effects` | 基于 Node.js 原生 `node:sqlite` 的单文件事务存储 + `effects` 持久化副作用表，零外部数据库依赖（无需 Postgres / Redis） | 砍掉 PostgreSQL + Redis 部署负担 |
 
 ---
 
-## 核心架构设计
+## 2. 极简目录结构（6 个核心模块）
 
 ```text
-                          ┌────────────────────────────────────────────────────────┐
-                          │             External Events / Human Input              │
-                          │      (Web UI / GitHub PR & CI Webhook / IM Trigger)    │
-                          └───────────────┬────────────────────────┬───────────────┘
-                                          │                        │
-                         [1. Admission & Mandate Gate]             │ [2. Thread Green-Channel]
-                         (Fast-Path 0-Token 规则快筛                │ (PR Review 评论 / CI 失败
-                          + Observe 待批 / Execute 授权单)          │  0 路由损耗直通原 Worker)
-                                          │                        │
-                                          ▼                        │
-                          ┌───────────────────────────────┐        │
-                          │   Foreground Coordinator      │        │
-                          │   (Mira Bot · 只动嘴不动手)     │        │
-                          │  • 零代码执行工具，秒级响应     │        │
-                          │  • 目标拆解 / Fan-out 并行派单 │        │
-                          └───────────────┬───────────────┘        │
-                                          │ Dispatch Ticket        │
-                                          ▼                        ▼
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                     Remote Server Daemon (7×24h 远端计算节点)                     │
-│                                                                                  │
-│   ┌──────────────────────┐   ┌──────────────────────┐   ┌──────────────────────┐ │
-│   │ Worker: codex-high   │   │ Worker: cc-xhigh     │   │ Worker: pi-verifier  │ │
-│   │ [Git Worktree #101]  │   │ [Git Worktree #102]  │   │ [Git Worktree #103]  │ │
-│   └──────────┬───────────┘   └──────────┬───────────┘   └──────────┬───────────┘ │
-│              └──────────────────────────┼──────────────────────────┘             │
-│                                         │                                        │
-│                        [3. Structured Verdict Submission]                        │
-│                 (Verdict: pass | fail | blocked + Artifacts + Confidence)        │
-│                                         │                                        │
-│                        [4. Acceptance & Targeted Rework]                         │
-│                 (Pass -> 归档合并  |  Reject -> 带 Rework Context 定向打回原分支)  │
-└──────────────────────────────────────────────────────────────────────────────────┘
-                 ▲
-                 └─── [5. Sweeper 自愈协程] 定时巡检假死 Task / 掉线 Runtime / 自动重派
+nocturn/
+├── src/
+│   ├── core/
+│   │   ├── model.ts        # 155 行：Task / Session / Run / Verdict / Attention / Input 领域模型
+│   │   └── engine.ts       # 554 行：纯状态机引擎（脉冲派单、Verdict、订阅扇出、Handback、两阶段回执与崩溃重放、定向返工）
+│   ├── store/
+│   │   └── sqlite.ts       # 300 行：基于 node:sqlite 的单文件事务存储 + Effects 持久化队列
+│   ├── daemon/
+│   │   └── pi-runner.ts    # 108 行：远端 sota 服务器 Pi 1.5.0 执行器（Git Worktree 隔离 + --session-id 跨周期恢复）
+│   ├── tools/
+│   │   └── nocturn-cli.ts  #  69 行：注入给 Agent 的 4 个正交原语 (report / handback / dispatch / note)
+│   ├── server/
+│   │   └── index.ts        # 166 行：轻量 HTTP API + 状态同步服务
+│   └── ui/
+│       └── index.html      # 单屏指挥舱 UI（中间恒定实时态势二部图 + 右侧四态伴随式 Session 抽屉）
+└── tests/
+    └── engine.test.ts      # 204 行：核心不变量与故障恢复测试套件
 ```
 
-### 1. 架构强制的「前台 Coordinator + 后台隔离 Worker」双层模型
-* **绝不超过两层**：摒弃低效的人类多级传话流程，全系统严格分为两层。
-* **前台总管（Coordinator）**：常驻在线，**从架构层剥夺写文件与执行 Bash 的工具权限**，只负责理解目标、签发不可变的 **Mandate（授权单）**、拆解子任务（支持 **Fan-out 并行拆分与 AND 收敛**）并派发给专职 Worker，确保前台对话永远秒回不阻塞。
-* **后台特种兵（Isolated Workers）**：每个 Worker 绑定专属底层 CLI（Claude Code / Codex / Pi）与模型档位，在远端服务器的独立 **Git Worktree** 中隔离执行，严禁直接对外刷屏，仅通过结构化协议汇报。
-
-### 2. Thread 订阅与「绿色通道直通（Green-Channel Wakeup）」
-* 当某个 Worker 在处理任务过程中创建或关联了 GitHub Pull Request，Nocturn 会自动为该 Worker 注册 **Thread Subscription**。
-* 后续该 PR 下产生的所有 Code Review 评论、CI Check 失败事件，**不再经过前台 Coordinator 二次路由转发**，而是通过绿色通道直接唤醒原 Worker 的既有 Session 与代码分支，节省 30%+ 路由 Token 并完整保留上下文。
-
-### 3. 两级准入过滤与 `Observe / Execute` 授权边界
-* **Fast Path（0 Token 规则快筛）**：对外部 Webhook 与群聊事件进行白名单、分支保护与显式提及过滤，直接拦截 90% 无关噪音。
-* **Mandate 授权单与 `Observe` 模式**：为每个任务生成不可变的权限边界（限定可读写仓库、分支及操作级别）；支持 `Observe`（观察记账模式）——先生成「拟执行计划卡」，人工在网页端点击 Approve 后再正式唤醒 Daemon 执行，后续 Thread 直通消息无法突破初始 Mandate 边界。
-
-### 4. 组织级 Loop Engineering：`Verdict` 准出、`Acceptance` 验收与定向 `Rework`
-* **结构化准出（Submission & Verdict）**：告别脆弱的自然语言状态猜测。Worker 结束任务时必须提交结构化 `Submission`：
-  * `verdict`: `pass` | `fail` | `blocked`
-  * `artifacts`: PR 链接、Commit SHA、改动摘要与测试报告
-  * `root_cause & confidence`: 根因解释与自评置信度
-* **`Agent Completed ≠ Business Completed`**：Worker 跑完且 CI 通过后进入 `Acceptance`（待验收态）。人类验收者点击 **Reject（驳回）** 时，系统带着 `rework_context` **定向打回原 Worker 节点与原分支重修**，无需全链路重头跑起。
-
-### 5. `Sweeper` 无人值守自愈 + `Now` 实时二部图态势台
-* **后台 `Sweeper` 巡检协程**：针对「凌晨 3 点无人盯屏」场景，定时巡检 Daemon 心跳、长时间卡在 `running` 的假死任务与孤儿节点，自动执行重置重派或升级为显式 `blocked`（附带 CLI/MCP `stderr` 结构化诊断摘要）。
-* **`Now (Who's doing what)` 实时连线大屏**：
-  * 采用 **二部图（Bipartite Graph）** 实时渲染左侧 `Coordinator & Workers` 与右侧 `Running Sessions / Tasks` 之间的平滑贝塞尔连线（区分 `Running`、`Delegating`、`Pending Acceptance`、`Observing` 状态）。
-  * 顶部实时追踪 **Agent Idle 率（24h 闲置率）**、**一次通过率（First-Pass Yield）** 与 **定向返工率（Rework Rate）**。
-
 ---
 
-## 全天候远端部署模型（Thin Client + Remote Server）
+## 3. 快速开始（零第三方 npm 依赖）
 
-Nocturn 遵循严格的**脑手驻留远端、本地轻量交互**原则：
+要求：Node.js `>= 22.6.0`（直接利用内置 `--experimental-strip-types`、`node:sqlite` 与 `node:test`）。
 
-* **远端服务器（如 `sota` 节点）**：7×24 小时运行 Nocturn Go Server、PostgreSQL、Redis 以及 `nocturnd` Daemon，托管所有 Git Worktree 与 Coding CLI 进程。
-* **本地终端（Mac / 浏览器）**：仅作为态势观察、指令下发与 `Acceptance` 审批面板。**合上笔记本电脑后，远端服务器上的 Coordinator 与 Worker 军团依然全速运转、处理 Webhook 并推进交付循环。**
+### 运行核心状态机与故障恢复测试
+```bash
+npm test
+```
+验证内容：
+1. **V0 & V1 跨周期连续性**：Leader 脉冲式派单后立即退出进程；Worker 在独立 Worktree 完成 Run 1 并退出后，人类发起定向返工（`Rework`）自动通过同一个原生 `piSessionId` 拉起 Run 2。
+2. **两阶段回执与崩溃重放**：运行中注入 `--steer` 插话（状态 `delivered`），模拟进程意外中断后恢复，验证未 `read` 的插话被自动重放。
+3. **订阅直达与越界退回（Handback）**：上报 `pr_number` 自动绑定 PR 订阅；越界请求通过 `nocturn handback` 退回给队长并自动生成新任务。
 
----
-
-## 项目演进路线（Roadmap）
-
-- [x] **Phase 0：架构蓝图与协议定义**（双层调度、Thread 直通、Verdict 准出与 Now 态势台规范）
-- [ ] **Phase 1：核心代码底座迁入与精简提纯**（Go Server + Web 控制台 + 远端 Daemon 协议，剥离非核心冗余）
-- [ ] **Phase 2：Coordinator → Worker 强制分工与 Thread 绿色通道实现**
-- [ ] **Phase 3：Verdict 结构化准出、Acceptance 定向 Rework 与 Sweeper 自愈协程**
-- [ ] **Phase 4：`Now — Who's doing what` 实时贝塞尔二部图态势台与 Idle 率指标面板**
-
----
-
-## 致谢与灵感来源
-
-Nocturn 的工程设计与架构演进深度汲取了以下开源项目与工程实践的启发：
-* **[Multica](https://github.com/multica-ai/multica)**：提供了优秀的 Go Server + Daemon + 多 CLI 运行时协作底座与「不超过两层（Orchestrator + Worker + Validator）、降低 Agent Idle 率」的核心理念。
-* **DeepSeek Super-agent 架构实践**：启发了「前台轻量 Router + 后台隔离 Worker」强制双层解耦、两级事件准入（Fast/Slow Path + Mandate / Observe）以及「Thread 订阅绿色通道直通」机制。
-* **腾讯技术工程（TEG）《凌晨3点，我的AI军团还在替我交付》**：启发了组织级 Loop Engineering 中的「`Verdict` 结构化准出协议」「`Agent Completed ≠ Business Completed`（Acceptance 与定向 Rework）」以及「`Sweeper` 防静默卡死巡检自愈」机制。
+### 启动本地服务与单屏指挥台
+```bash
+npm start
+# 打开浏览器访问 http://localhost:4100
+```

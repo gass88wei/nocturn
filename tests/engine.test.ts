@@ -63,7 +63,7 @@ describe("Nocturn Core Engine & Distilled Mechanisms", () => {
     assert.equal(leaderSession.activeRunId, null, "Leader must not stay running after dispatching");
 
     const workerSession = store.getSessionByPair("pi-coder", task.id)!;
-    assert.ok(workerSession.piSessionId?.startsWith("pi_sota_"), "Worker native Pi session ID bound");
+    assert.ok(workerSession.piSessionId && workerSession.piSessionId.length >= 32, "Worker native Pi session UUID bound");
     const firstPiSessionId = workerSession.piSessionId;
     assert.equal(workerSession.activeRunId, workerRun.id);
 
