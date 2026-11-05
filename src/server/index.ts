@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NocturnStore } from "../store/sqlite.ts";
@@ -41,7 +41,7 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
     }
   });
 
-  // Seed default squads, agents, and initial tasks into SQLite if empty
+  // Seed ONLY the real squads & agents (NO fake mock tasks!)
   if (store.listSquads().length === 0) {
     store.saveSquad({
       id: "dev",
@@ -107,83 +107,9 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       skills: ["benchmark"],
       instructions: "在 sota 节点执行长会话稳定性压测。",
     });
-
-    // Seed initial tasks into SQLite
-    engine.createTask({
-      identifier: "TASK-431",
-      title: "#431 新增 GitHub Webhook 签名校验",
-      description: "由 TASK-427 越界退回 (Handback) 自动创建的独立安全任务",
-      squadId: "dev",
-    });
-
-    const t427 = engine.createTask({
-      identifier: "TASK-427",
-      title: "#427 仓库页预览与二部图重构",
-      description: "在独立 worktree 中完成二部图与右侧抽屉重构",
-      squadId: "dev",
-    });
-    engine.dispatchTask({
-      taskId: t427.id,
-      workerAgentId: "pi-coder",
-      orderText: "完成二部图重构并补充单测",
-    });
-    engine.reportVerdict({
-      taskId: t427.id,
-      agentId: "pi-coder",
-      state: "progress",
-      summary: "已完成 SVG 曲线改造，正在补桌面端单测",
-      humanAction: "屏幕宽度小于 960px 时，右侧抽屉用浮层覆盖还是上下分栏折叠？",
-      humanActionOptions: ["做成右侧浮层覆盖 (Overlay)", "做成上下分栏折叠"],
-      prNumber: 112,
-    });
-
-    const t428 = engine.createTask({
-      identifier: "TASK-428",
-      title: "#428 会话跨周期 (--session-id) 恢复测试",
-      description: "验证 sota 上跨 Run 恢复同一个原生 Pi 会话",
-      squadId: "dev",
-    });
-    engine.dispatchTask({
-      taskId: t428.id,
-      workerAgentId: "pi-coder",
-      orderText: "验证跨 Run 恢复逻辑",
-    });
-
-    const t425 = engine.createTask({
-      identifier: "TASK-425",
-      title: "#425 单用户 Cookie 顺序修复",
-      description: "修复同名 Cookie 覆盖隐患",
-      squadId: "dev",
-    });
-    engine.dispatchTask({
-      taskId: t425.id,
-      workerAgentId: "codex-reviewer",
-      orderText: "审查 PR #108 并运行回归测试",
-    });
-    engine.reportVerdict({
-      taskId: t425.id,
-      agentId: "codex-reviewer",
-      state: "ready",
-      summary: "PR #108 的 47 项回归测试全部通过，置信度 0.96",
-      prNumber: 108,
-    });
-
-    const t430 = engine.createTask({
-      identifier: "TASK-430",
-      title: "#430 Pi 1.5.0 远端长会话稳定性压测",
-      description: "在 sota 节点执行 50 轮连续会话恢复压测",
-      squadId: "ops",
-    });
-    engine.dispatchTask({
-      taskId: t430.id,
-      workerAgentId: "bench-worker",
-      orderText: "运行 50 轮长会话恢复压测",
-    });
-
-    void runner.processPendingEffects();
   }
 
-  // Enable automatic sota execution for all newly created/dispatched tasks when running live server
+  // Enable automatic sota execution for newly created/dispatched tasks when running live server
   if (dbPath !== ":memory:") {
     runner.options.autoSpawnOnSota = true;
   }
@@ -208,7 +134,7 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       if (req.method === "OPTIONS") {
         res.writeHead(204, {
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type",
         });
         res.end();
@@ -224,7 +150,6 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
         return;
       }
 
-      // Live Server-Sent Events (SSE) stream for real-time UI updates
       if (req.method === "GET" && url.pathname === "/api/events") {
         res.writeHead(200, {
           "Content-Type": "text/event-stream",
@@ -244,13 +169,15 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       }
 
       if (req.method === "GET" && url.pathname === "/api/pelican.svg") {
-        const svgContent = readFileSync(join(__dirname, "../../pelican-bicycle.svg"), "utf8");
-        res.writeHead(200, {
-          "Content-Type": "image/svg+xml; charset=utf-8",
-          "Access-Control-Allow-Origin": "*",
-        });
-        res.end(svgContent);
-        return;
+        const svgPath = join(__dirname, "../../pelican-bicycle.svg");
+        if (existsSync(svgPath)) {
+          res.writeHead(200, {
+            "Content-Type": "image/svg+xml; charset=utf-8",
+            "Access-Control-Allow-Origin": "*",
+          });
+          res.end(readFileSync(svgPath, "utf8"));
+          return;
+        }
       }
 
       if (req.method === "POST" && url.pathname === "/api/agents") {
@@ -261,7 +188,7 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
           squadId: body.squadId ? String(body.squadId) : "dev",
           role: (body.role as Agent["role"]) ?? "worker",
           cli: (body.cli as Agent["cli"]) ?? "pi",
-          model: String(body.model ?? "gemini-4-argon-high"),
+          model: String(body.model ?? "Deepseek-V4.1-Flash/deepseek-v4.1-flash"),
           skills: Array.isArray(body.skills) ? body.skills.map(String) : ["coding"],
           instructions: String(body.instructions ?? ""),
         });
@@ -271,8 +198,10 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
 
       if (req.method === "POST" && url.pathname === "/api/tasks") {
         const body = await readJsonBody(req);
+        const existingCount = store.listTasks().length;
+        const identifier = String(body.identifier ?? `TASK-${101 + existingCount}`);
         const task = engine.createTask({
-          identifier: String(body.identifier ?? `TASK-${430 + store.listTasks().length + 1}`),
+          identifier,
           title: String(body.title ?? ""),
           description: String(body.description ?? ""),
           squadId: String(body.squadId ?? "dev"),
@@ -280,6 +209,20 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
         });
         await runner.processPendingEffects();
         sendJson(res, 201, task);
+        return;
+      }
+
+      if (req.method === "DELETE" && url.pathname.startsWith("/api/tasks/")) {
+        const targetId = decodeURIComponent(url.pathname.slice("/api/tasks/".length));
+        const task = store.getTask(targetId);
+        if (task) {
+          store.db.prepare("DELETE FROM tasks WHERE id = ?").run(task.id);
+          store.db.prepare("DELETE FROM runs WHERE task_id = ?").run(task.id);
+          store.db.prepare("DELETE FROM sessions WHERE task_id = ?").run(task.id);
+          store.db.prepare("DELETE FROM inputs WHERE task_id = ?").run(task.id);
+          engine.notifyChange();
+        }
+        sendJson(res, 200, { ok: true });
         return;
       }
 
@@ -363,10 +306,9 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
         return;
       }
 
-      // Execute a real streaming turn on remote sota server using Pi 1.5.0 (--session-id <uuid>)
       if (req.method === "POST" && url.pathname === "/api/sota/exec") {
         const body = await readJsonBody(req);
-        const task = store.getTask(String(body.taskId ?? "TASK-427"));
+        const task = store.getTask(String(body.taskId));
         if (!task) throw new Error("Task not found");
         const agentId = String(body.agentId ?? task.assignedWorkerId ?? task.leaderAgentId);
         const session = engine.ensureSession(agentId, task.id);
