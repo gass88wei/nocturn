@@ -3,6 +3,12 @@ import { randomUUID } from "node:crypto";
 import type { NocturnEngine } from "../core/engine.ts";
 import { buildLeaderBriefing, buildWorkerBriefing } from "../core/briefing.ts";
 
+export const LEADER_MODEL = "Deepseek-V4.1-Flash/gemini-4-argon-high";
+export const WORKER_MODELS = [
+  "Deepseek-V4.1-Flash/deepseek-v4.1-flash",
+  "zgca/deepseek-flash",
+] as const;
+
 export interface SotaPiRunnerOptions {
   /** SSH target for remote sota execution (never executes agent sessions on local Mac) */
   sshHost?: string;
@@ -20,6 +26,28 @@ export class SotaPiRunner {
   readonly engine: NocturnEngine;
   readonly options: Required<SotaPiRunnerOptions>;
   private activeProcesses = new Map<string, ChildProcess>();
+  private workerModelIndex = 0;
+
+  /**
+   * Resolve the model for an Agent:
+   * - Leaders always use `Deepseek-V4.1-Flash/gemini-4-argon-high`
+   * - Workers mix `Deepseek-V4.1-Flash/deepseek-v4.1-flash` and `zgca/deepseek-flash`
+   */
+  resolveAgentModel(agentId: string): string {
+    const agent = this.engine.store.getAgent(agentId);
+    if (!agent || agent.role === "leader" || agent.role === "chief") {
+      return LEADER_MODEL;
+    }
+    if (
+      agent.model &&
+      (agent.model.includes("deepseek-v4.1-flash") || agent.model.includes("zgca/deepseek-flash"))
+    ) {
+      return agent.model;
+    }
+    const chosen = WORKER_MODELS[this.workerModelIndex % WORKER_MODELS.length];
+    this.workerModelIndex++;
+    return chosen;
+  }
 
   constructor(engine: NocturnEngine, options: SotaPiRunnerOptions = {}) {
     this.engine = engine;
@@ -40,10 +68,12 @@ export class SotaPiRunner {
   buildSotaPiCommand(params: {
     worktreePath: string;
     piSessionId: string;
+    model?: string;
     prompt: string;
-  }): { bin: string; args: string[] } {
+  }): { bin: string; args: string[]; model: string } {
+    const model = params.model ?? LEADER_MODEL;
     const escapedPrompt = params.prompt.replace(/'/g, `'\\''`);
-    const remoteCmd = `mkdir -p ${params.worktreePath} && cd ${params.worktreePath} && /usr/local/bin/pi --mode json --session-id ${params.piSessionId} -p '${escapedPrompt}'`;
+    const remoteCmd = `mkdir -p ${params.worktreePath} && cd ${params.worktreePath} && /usr/local/bin/pi --mode json --model ${model} --session-id ${params.piSessionId} -p '${escapedPrompt}'`;
 
     return {
       bin: "ssh",
@@ -55,6 +85,7 @@ export class SotaPiRunner {
         this.options.sshHost,
         remoteCmd,
       ],
+      model,
     };
   }
 
@@ -166,13 +197,19 @@ export class SotaPiRunner {
       this.engine.bindNativePiSessionId(session.id, randomUUID());
     }
     const refreshed = this.engine.store.getSession(session.id)!;
+    const model = this.resolveAgentModel(run.agentId);
     const prompt = this.buildBriefingForTaskAgent(run.taskId, run.agentId, run.summary);
+    this.engine.appendRunStep(run.id, {
+      badge: "步骤",
+      text: `[模型路由] ${run.agentId} 使用模型 ${model}`,
+    });
 
     try {
       await this.runLiveOnSota({
         runId: run.id,
         worktreePath: refreshed.worktreePath,
         piSessionId: refreshed.piSessionId!,
+        model,
         prompt,
       });
     } catch (err) {
@@ -204,9 +241,10 @@ export class SotaPiRunner {
     runId?: string;
     worktreePath: string;
     piSessionId: string;
+    model?: string;
     prompt: string;
-  }): Promise<{ code: number | null; assistantText: string; rawLines: string[] }> {
-    const { bin, args } = this.buildSotaPiCommand(params);
+  }): Promise<{ code: number | null; assistantText: string; model: string; rawLines: string[] }> {
+    const { bin, args, model } = this.buildSotaPiCommand(params);
     return new Promise((resolve, reject) => {
       const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
       if (params.runId) {
@@ -278,7 +316,7 @@ export class SotaPiRunner {
         if (code !== 0 && !assistantText) {
           assistantText = stderr.trim();
         }
-        resolve({ code, assistantText: assistantText.trim(), rawLines });
+        resolve({ code, assistantText: assistantText.trim(), model, rawLines });
       });
     });
   }

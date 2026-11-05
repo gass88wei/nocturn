@@ -63,7 +63,7 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       squadId: "dev",
       role: "leader",
       cli: "pi",
-      model: "gemini-4-argon-high",
+      model: "Deepseek-V4.1-Flash/gemini-4-argon-high",
       skills: ["dispatch", "handoff", "fanout"],
       instructions: "只负责派单与验收，派单后立即退出进程 (Stop after dispatching)。",
     });
@@ -73,7 +73,7 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       squadId: "dev",
       role: "worker",
       cli: "pi",
-      model: "gemini-4-argon-high",
+      model: "Deepseek-V4.1-Flash/deepseek-v4.1-flash",
       skills: ["fullstack", "worktree", "unit-test"],
       instructions: "在 sota 独立 Git Worktree 执行编码任务并通过 nocturn report 汇报。",
     });
@@ -83,7 +83,7 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       squadId: "dev",
       role: "worker",
       cli: "pi",
-      model: "deepseek-v4.1-flash",
+      model: "zgca/deepseek-flash",
       skills: ["review", "regression-test"],
       instructions: "审查 PR 并提交结构化 Verdict。",
     });
@@ -93,7 +93,7 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       squadId: "ops",
       role: "leader",
       cli: "pi",
-      model: "gemini-4-argon-high",
+      model: "Deepseek-V4.1-Flash/gemini-4-argon-high",
       skills: ["dispatch", "ops"],
       instructions: "协调压测与巡检任务。",
     });
@@ -103,7 +103,7 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       squadId: "ops",
       role: "worker",
       cli: "pi",
-      model: "gemini-4-argon-high",
+      model: "zgca/deepseek-flash",
       skills: ["benchmark"],
       instructions: "在 sota 节点执行长会话稳定性压测。",
     });
@@ -367,17 +367,20 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
 
         const refreshedSession = store.getSession(session.id)!;
         const activeRunId = refreshedSession.activeRunId ?? undefined;
+        const chosenModel = runner.resolveAgentModel(agentId);
 
         const sotaRes = await runner.runLiveOnSota({
           runId: activeRunId,
           worktreePath: refreshedSession.worktreePath,
           piSessionId: refreshedSession.piSessionId!,
+          model: chosenModel,
           prompt: promptText,
         });
 
         sendJson(res, 200, {
           ok: true,
           runId: activeRunId,
+          model: chosenModel,
           piSessionId: refreshedSession.piSessionId,
           worktreePath: refreshedSession.worktreePath,
           sotaReply: sotaRes.assistantText,
