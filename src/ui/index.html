@@ -913,6 +913,29 @@
     // 只保留你真正跑过的 2 个真实任务作为离线兜底（彻底删除所有假 Mock 任务！）
     let tasksData = [
       {
+        id: "task_450",
+        identifier: "TASK-450",
+        boundIssue: "nocturn#450",
+        title: "#450 实现 array-stats.js (mean 与 median) 并通过 Reviewer 自动验收结单",
+        squadId: "dev",
+        status: "done",
+        leaderAgentId: "dev-leader",
+        assignedWorkerId: "codex-reviewer",
+        latestVerdict: {
+          state: "ready",
+          risk: "low",
+          summary: "独立审查通过 (Auto-Done)：array-stats.js 采用 Neumaier 补偿求和与非破坏性排序中位数；独立复跑 12/12 单测与 200 万元素边界抽查全部通过，低风险自动结单。"
+        },
+        leaderNote: "pi-coder 20s 完成实现 -> 队长自动转交 @codex-reviewer -> 18s 审查通过 (risk=low) 自动结单。",
+        steps: [
+          { badge: "步骤", text: "1. [+8s] dev-leader (gemini-4-argon-high) 派单 -> @pi-coder" },
+          { badge: "步骤", text: "2. [+28s] pi-coder (deepseek-v4.1-flash) 写完 array-stats.js & 12项单测通过 -> report ready" },
+          { badge: "步骤", text: "3. [+36s] 恢复 dev-leader 原会话 (3be16ae6) -> 自动转派给 @codex-reviewer" },
+          { badge: "步骤", text: "4. [+54s] codex-reviewer (zgca/deepseek-flash) 复跑12项单测+边界抽查 -> report ready (risk=low)" },
+          { badge: "Report", text: "✅ 自动验收结单 (Auto-Done)：status=done，全程 54 秒零人工点击" }
+        ]
+      },
+      {
         id: "task_448",
         identifier: "TASK-448",
         boundIssue: "nocturn#448",
@@ -983,7 +1006,7 @@
     let centerTab = "now"; // 'now' | 'issues'
     let drawerViewMode = "task"; // 'task' | 'leader' | 'worker'
     let issueFilter = "all";
-    let selectedTaskId = "task_448";
+    let selectedTaskId = "task_450";
     let selectedActorId = null;
     let selectedSquadId = null;
     let hoveredActorId = null;
