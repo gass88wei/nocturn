@@ -549,6 +549,79 @@
       line-height: 1.35;
     }
 
+    /* 四棒接力连接线进度条（一眼看清某个 Issue 当前处理到哪一棒！） */
+    .issue-pipeline-track {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .pipeline-nodes-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+    }
+    .pipeline-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      z-index: 2;
+      flex: 1;
+      text-align: center;
+    }
+    .pipeline-circle {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 0 1px #cbd5e1;
+    }
+    .pipeline-node.done .pipeline-circle {
+      background: #10b981;
+      color: #ffffff;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+    }
+    .pipeline-node.running .pipeline-circle {
+      background: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22);
+    }
+    .pipeline-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #334155;
+    }
+    .pipeline-sub {
+      font-size: 9.5px;
+      color: #64748b;
+    }
+    .pipeline-connector {
+      flex: 1;
+      height: 2.5px;
+      background: #cbd5e1;
+      margin: -18px -12px 0;
+      z-index: 1;
+      border-radius: 2px;
+    }
+    .pipeline-connector.done {
+      background: #10b981;
+    }
+    .pipeline-connector.running {
+      background: linear-gradient(90deg, #10b981, #2563eb);
+    }
+
     /* Multica `DeliverablesSection`：任务交付产物与工作区真实源码查看器 */
     .deliverables-card {
       border: 1px solid #e2e8f0;
@@ -815,11 +888,11 @@
             </span>
           </div>
 
-          <!-- Multica 视图切换器：分组列表 (List) | 状态看板 (Board) | 实时连线 (Now) -->
+          <!-- Multica 视图切换器：实时态势连线 (Now) | 分组列表 (List) | 状态看板 (Board) -->
           <div class="view-mode-switcher">
-            <button class="mode-btn active" id="modeBtnList" onclick="setSurfaceMode('list')">📑 分组列表</button>
+            <button class="mode-btn active" id="modeBtnNow" onclick="setSurfaceMode('now')">⚡ 实时态势连线 (Now)</button>
+            <button class="mode-btn" id="modeBtnList" onclick="setSurfaceMode('list')">📑 分组列表</button>
             <button class="mode-btn" id="modeBtnBoard" onclick="setSurfaceMode('board')">📊 状态看板</button>
-            <button class="mode-btn" id="modeBtnNow" onclick="setSurfaceMode('now')">⚡ 实时态势 (Now)</button>
           </div>
         </header>
 
@@ -832,20 +905,14 @@
             <button class="send-btn" style="height:29px;white-space:nowrap;" onclick="submitLiveTaskFromBar()">🚀 派单给 sota</button>
           </div>
 
-          <!-- 容器 1：Multica 默认分组列表视图 (按 进行中 / 待审核 / 已自动结单 清晰分组) -->
-          <div id="viewContainerList" style="display:flex;flex-direction:column;gap:12px;"></div>
-
-          <!-- 容器 2：Multica 看板列视图 (三列看板) -->
-          <div id="viewContainerBoard" class="board-grid" style="display:none;"></div>
-
-          <!-- 容器 3：你的标志性「实时态势二部图 (Now)」 -->
-          <div id="viewContainerNow" class="now-card" style="display:none;">
+          <!-- 容器 3 (默认主视图展示！)：你的标志性「实时态势二部图 (Now)」 -->
+          <div id="viewContainerNow" class="now-card" style="display:flex;">
             <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:#64748b;">
-              <span><strong>实时态势 (Now)</strong> — 左侧小队与智能体 ➔ 右侧任务胶囊连线图</span>
-              <div style="display:flex;gap:12px;">
-                <span>🟣 队长派单中</span>
-                <span>🔵 组员执行中</span>
-                <span>⚪ 虚线：等待回调</span>
+              <span><strong>实时态势 (Now — 谁正在干什么)</strong> · 点击右侧任意 Issue 查看它的四棒进度线与产出源码</span>
+              <div style="display:flex;gap:14px;align-items:center;">
+                <span style="display:inline-flex;align-items:center;gap:5px;"><svg width="20" height="8"><line x1="1" y1="4" x2="19" y2="4" stroke="#7c3aed" stroke-width="2.5"/></svg>队长派单中</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;"><svg width="20" height="8"><line x1="1" y1="4" x2="19" y2="4" stroke="#2563eb" stroke-width="2.5"/></svg>组员执行中</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;"><svg width="20" height="8"><line x1="1" y1="4" x2="19" y2="4" stroke="#64748b" stroke-width="2" stroke-dasharray="3 3"/></svg>等待回调</span>
               </div>
             </div>
             <div class="bipartite-stage" id="bipartiteStage">
@@ -854,6 +921,12 @@
               <div class="right-column" id="rightColumn"></div>
             </div>
           </div>
+
+          <!-- 容器 1：Multica 分组列表视图 (默认同时显示在二部图下方，既能看连线又能看按状态分组的 Issue 列表！) -->
+          <div id="viewContainerList" style="display:flex;flex-direction:column;gap:12px;"></div>
+
+          <!-- 容器 2：Multica 看板列视图 (三列看板) -->
+          <div id="viewContainerBoard" class="board-grid" style="display:none;"></div>
         </div>
       </div>
 
@@ -1148,7 +1221,7 @@
     ];
 
     let sidebarFilter = "all"; // 'all' | 'active' | 'inbox' | 'done' | 'squad:dev' | 'agent:pi-coder' ...
-    let surfaceMode = "list";  // 'list' | 'board' | 'now'
+    let surfaceMode = "now";   // 默认同时展示 Now 二部图连线 + 下方分组 Issue 列表！
     let selectedTaskId = "task_451";
     let expandedRunIds = {};   // runId -> boolean (默认收起已完成的步骤，保持界面清爽！)
     let cachedWorktreeFiles = {}; // taskCode -> { worktreePath, files: [{name, size, content}] }
@@ -1183,12 +1256,12 @@
 
     function setSurfaceMode(mode) {
       surfaceMode = mode;
+      document.getElementById("modeBtnNow").classList.toggle("active", mode === "now");
       document.getElementById("modeBtnList").classList.toggle("active", mode === "list");
       document.getElementById("modeBtnBoard").classList.toggle("active", mode === "board");
-      document.getElementById("modeBtnNow").classList.toggle("active", mode === "now");
-      document.getElementById("viewContainerList").style.display = mode === "list" ? "flex" : "none";
-      document.getElementById("viewContainerBoard").style.display = mode === "board" ? "grid" : "none";
       document.getElementById("viewContainerNow").style.display = mode === "now" ? "flex" : "none";
+      document.getElementById("viewContainerList").style.display = (mode === "list" || mode === "now") ? "flex" : "none";
+      document.getElementById("viewContainerBoard").style.display = mode === "board" ? "grid" : "none";
       syncUI();
     }
 
@@ -1365,8 +1438,50 @@
         ? `<div class="code-viewer-box">${selectedFileObj.content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
         : "";
 
-      // B. 按回合分组的 `CommentCard` + `InlineCommentRun` 接力时间线（每个 Run 一张干净卡片，工具步骤默认折叠！）
       const runs = t.runs || [];
+      const isDone = t.status === "done" || t.status === "in_review";
+      const isReviewerTurn = isDone || t.assignedWorkerId === "codex-reviewer" || runs.length >= 3;
+      const isCoderTurn = isReviewerTurn || t.assignedWorkerId === "pi-coder" || runs.length >= 2;
+
+      const s1Class = isCoderTurn ? "done" : "running";
+      const s2Class = isReviewerTurn ? "done" : (t.assignedWorkerId === "pi-coder" ? "running" : "");
+      const s3Class = isReviewerTurn ? "done" : "";
+      const s4Class = isDone ? "done" : (t.assignedWorkerId === "codex-reviewer" ? "running" : "");
+
+      const pipelineHtml = `
+        <div class="issue-pipeline-track">
+          <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:#334155;">
+            <span>🔗 Issue 处理进度线 (${t.identifier})</span>
+            <span style="color:#059669;">${isDone ? '全部 4 棒已完成 ✓' : 'sota 正在接力推进中...'}</span>
+          </div>
+          <div class="pipeline-nodes-row">
+            <div class="pipeline-node ${s1Class}">
+              <div class="pipeline-circle">${s1Class === 'done' ? '✓' : '1'}</div>
+              <div class="pipeline-label">① 队长拆单</div>
+              <div class="pipeline-sub">dev-leader</div>
+            </div>
+            <div class="pipeline-connector ${s1Class}"></div>
+            <div class="pipeline-node ${s2Class}">
+              <div class="pipeline-circle">${s2Class === 'done' ? '✓' : '2'}</div>
+              <div class="pipeline-label">② 编码自测</div>
+              <div class="pipeline-sub">pi-coder</div>
+            </div>
+            <div class="pipeline-connector ${s2Class}"></div>
+            <div class="pipeline-node ${s3Class}">
+              <div class="pipeline-circle">${s3Class === 'done' ? '✓' : '3'}</div>
+              <div class="pipeline-label">③ 队长转审</div>
+              <div class="pipeline-sub">dev-leader</div>
+            </div>
+            <div class="pipeline-connector ${s3Class}"></div>
+            <div class="pipeline-node ${s4Class}">
+              <div class="pipeline-circle">${s4Class === 'done' ? '✓' : '4'}</div>
+              <div class="pipeline-label">④ 审查结单</div>
+              <div class="pipeline-sub">reviewer</div>
+            </div>
+          </div>
+        </div>
+      `;
+
       const turnsHtml = runs.map((r, idx) => {
         const meta = AGENT_META[r.agentId] || { name: r.agentId, model: "deepseek-flash", role: "执行回合" };
         const isRunning = r.status === "running";
@@ -1401,6 +1516,9 @@
 
       document.getElementById("drawerScroll").innerHTML = `
         <h2 class="drawer-task-title">${t.title}</h2>
+
+        <!-- 顶部直观展示该 Issue 当前处理到哪一棒的进度连线 -->
+        ${pipelineHtml}
 
         <!-- 交付产物与工作区真实源码区 (DeliverablesSection) -->
         <div class="deliverables-card">
@@ -1758,9 +1876,14 @@
     function syncUI() {
       const filtered = getFilteredTasks();
       renderSidebar();
-      if (surfaceMode === "list") renderGroupedListView(filtered);
-      else if (surfaceMode === "board") renderBoardView(filtered);
-      else renderNowGraph(filtered);
+      if (surfaceMode === "now") {
+        renderNowGraph(filtered);
+        renderGroupedListView(filtered);
+      } else if (surfaceMode === "list") {
+        renderGroupedListView(filtered);
+      } else if (surfaceMode === "board") {
+        renderBoardView(filtered);
+      }
       renderTaskDetailDrawer();
     }
 
