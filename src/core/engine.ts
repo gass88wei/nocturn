@@ -187,7 +187,7 @@ export class NocturnEngine {
       agentId,
       taskId,
       piSessionId: null,
-      worktreePath: `${baseWorkDir}/worktrees/${slug}-${agentId}`,
+      worktreePath: `${baseWorkDir}/worktrees/${slug}`,
       activeRunId: null,
       updatedAt: new Date().toISOString(),
     };
@@ -447,14 +447,34 @@ export class NocturnEngine {
         }
       }
 
-      // Advance Task status & trigger Squad Leader Join Gate wakeup on ready / blocked
+      // Advance Task status & trigger Squad Leader Join Gate / Reviewer handoff on ready / blocked
       if (params.state === "ready") {
-        task.status = "in_review";
-        this.store.enqueueEffect("wake_leader", `wake:${task.id}:ready:${now}`, {
-          taskId: task.id,
-          leaderAgentId: task.leaderAgentId,
-          reason: `组员 ${params.agentId} 提交结构化 Verdict=ready: ${params.summary}`,
-        });
+        const hasReviewerInSquad = this.store
+          .listAgents()
+          .some((a) => a.squadId === task.squadId && a.id === "codex-reviewer");
+        const isCoderSubmission =
+          hasReviewerInSquad &&
+          params.agentId === "pi-coder" &&
+          !task.parentTaskId;
+
+        if (isCoderSubmission) {
+          // Coder finished implementation -> wake Squad Leader to hand off to codex-reviewer!
+          task.status = "dispatching";
+          this.store.enqueueEffect("wake_leader", `wake:${task.id}:coder_ready:${now}`, {
+            taskId: task.id,
+            leaderAgentId: task.leaderAgentId,
+            autoSpawnLeader: true,
+            reason: `编码组员 ${params.agentId} 已完成代码编写并上报 Verdict=ready（${params.summary}）。请立即调用 nocturn dispatch --task ${task.identifier} --to codex-reviewer --order "请审查 ${task.identifier} 工作区下的代码与测试，执行测试验证通过后调用 nocturn report --task ${task.identifier} --agent codex-reviewer --state ready --summary '<审查结论>' 交付" 将任务转交给审查员 codex-reviewer！`,
+          });
+        } else {
+          task.status = "in_review";
+          this.store.enqueueEffect("wake_leader", `wake:${task.id}:ready:${now}`, {
+            taskId: task.id,
+            leaderAgentId: task.leaderAgentId,
+            autoSpawnLeader: false,
+            reason: `组员 ${params.agentId} 提交最终准出 Verdict=ready: ${params.summary}`,
+          });
+        }
 
         // If this Task is a child subtask (`parentTaskId`), check the AND Join Gate across all siblings!
         if (task.parentTaskId) {

@@ -913,6 +913,28 @@
     // 只保留你真正跑过的 2 个真实任务作为离线兜底（彻底删除所有假 Mock 任务！）
     let tasksData = [
       {
+        id: "task_448",
+        identifier: "TASK-448",
+        boundIssue: "nocturn#448",
+        title: "#448 编写 string-utils.js (reverse 与 isPalindrome) 并交由 Reviewer 审查",
+        squadId: "dev",
+        status: "in_review",
+        leaderAgentId: "dev-leader",
+        assignedWorkerId: "codex-reviewer",
+        latestVerdict: {
+          state: "ready",
+          summary: "VERDICT: APPROVE（无阻塞问题，可合入）。独立复跑 node string-utils.test.js 13/13 通过，并抽查代理对 emoji、NFKC 归一化与异常边界全部通过。"
+        },
+        leaderNote: "pi-coder 完成实现后自动唤醒队长，已转交 @codex-reviewer 完成独立代码审查。",
+        steps: [
+          { badge: "步骤", text: "1. dev-leader (gemini-4-argon-high) 派单 -> @pi-coder" },
+          { badge: "步骤", text: "2. pi-coder (deepseek-v4.1-flash) 编写 string-utils.js & 13项单测通过 -> report ready" },
+          { badge: "步骤", text: "3. 自动恢复 dev-leader 原会话 (8a01972b) -> 转派给 @codex-reviewer" },
+          { badge: "步骤", text: "4. codex-reviewer (zgca/deepseek-flash) 独立复跑 13 项单测与边界抽查" },
+          { badge: "Report", text: "Verdict=ready · VERDICT: APPROVE (13/13 pass，准出待人类审核)" }
+        ]
+      },
+      {
         id: "task_445",
         identifier: "TASK-445",
         boundIssue: "nocturn#445",
@@ -960,7 +982,7 @@
     let centerTab = "now"; // 'now' | 'issues'
     let drawerViewMode = "task"; // 'task' | 'leader' | 'worker'
     let issueFilter = "all";
-    let selectedTaskId = "task_445";
+    let selectedTaskId = "task_448";
     let selectedActorId = null;
     let selectedSquadId = null;
     let hoveredActorId = null;

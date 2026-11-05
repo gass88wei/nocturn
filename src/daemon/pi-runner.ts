@@ -154,20 +154,37 @@ export class SotaPiRunner {
         }
         continue;
       } else if (eff.kind === "wake_leader") {
-        const { taskId, leaderAgentId, reason } = eff.payload as {
+        const { taskId, leaderAgentId, reason, autoSpawnLeader } = eff.payload as {
           taskId: string;
           leaderAgentId: string;
           reason: string;
+          autoSpawnLeader?: boolean;
         };
         const leaderSession = this.engine.ensureSession(leaderAgentId, taskId);
-        // Record the wakeup pulse on Leader's Session
         if (!leaderSession.activeRunId) {
           const wakeRun = this.engine.startRun(leaderSession.id, true, reason);
           this.engine.appendRunStep(wakeRun.id, {
             badge: "Report",
             text: `[自动唤醒队长] ${reason}`,
           });
-          // Leader records verification and completes pulse turn
+
+          if (!this.options.dryRun && this.options.autoSpawnOnSota && autoSpawnLeader) {
+            this.engine.store.markEffectDone(eff.id);
+            processed++;
+            // Process the launch_run effect created by startRun and spawn Leader on sota
+            for (const subEff of this.engine.store.listPendingEffects()) {
+              if (subEff.kind === "launch_run" && subEff.payload.runId === wakeRun.id) {
+                if (!leaderSession.piSessionId) {
+                  this.engine.bindNativePiSessionId(leaderSession.id, randomUUID());
+                }
+                this.engine.store.markEffectDone(subEff.id);
+              }
+            }
+            void this.executeRunOnSota(wakeRun.id);
+            continue;
+          }
+
+          // Otherwise settle Leader verification pulse turn immediately
           this.engine.store.atomic(() => {
             const r = this.engine.store.getRun(wakeRun.id);
             const s = this.engine.store.getSession(leaderSession.id);
