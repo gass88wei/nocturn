@@ -1,6 +1,10 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { join, dirname } from "node:path";
+
+const execFileAsync = promisify(execFile);
 import { fileURLToPath } from "node:url";
 import { NocturnStore } from "../store/sqlite.ts";
 import { NocturnEngine } from "../core/engine.ts";
@@ -190,6 +194,40 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
           res.end(readFileSync(svgPath, "utf8"));
           return;
         }
+      }
+
+      // Live sota worktree file explorer API: returns files and source code for a Task
+      if (req.method === "GET" && url.pathname === "/api/worktree-files") {
+        const taskCode = String(url.searchParams.get("task") ?? "TASK-451").toLowerCase();
+        const pyScript = `
+import os, json, glob
+base = "/home/qijinyin/multimodal/yangxin/nocturn/worktrees"
+dirs = sorted(glob.glob(f"{base}/{taskCode}*"))
+out = []
+wdir = dirs[0] if dirs else f"{base}/{taskCode}"
+for d in dirs:
+    for entry in sorted(os.listdir(d)):
+        if entry.startswith("."): continue
+        fp = os.path.join(d, entry)
+        if os.path.isfile(fp) and os.path.getsize(fp) < 200000:
+            with open(fp, "r", encoding="utf-8", errors="replace") as f:
+                out.append({"name": entry, "path": fp, "size": os.path.getsize(fp), "content": f.read()})
+print(json.dumps({"worktreePath": wdir, "files": out}))
+`;
+        const { stdout } = await execFileAsync("ssh", [
+          "-p",
+          String(runner.options.sshPort),
+          "-o",
+          `ControlPath=${runner.options.sshControlSocket}`,
+          runner.options.sshHost,
+          `python3 -c '${pyScript.replace(/'/g, "'\\''")}'`,
+        ]);
+        res.writeHead(200, {
+          "Content-Type": "application/json; charset=utf-8",
+          "Access-Control-Allow-Origin": "*",
+        });
+        res.end(stdout.trim());
+        return;
       }
 
       if (req.method === "POST" && url.pathname === "/api/agents") {
