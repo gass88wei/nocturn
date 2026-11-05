@@ -1292,6 +1292,29 @@
             dotType: "blue",
             workerSessions: [
               {
+                taskId: "p445",
+                taskCode: "TASK-445",
+                taskTitle: "#445 画个鹈鹕骑自行车的s v g",
+                elapsed: "已交付",
+                active: false,
+                subscriptions: ["Issue #445"],
+                verdict: {
+                  state: "ready",
+                  label: "准出裁定 Verdict：ready (sota 真机生成 pelican-bicycle.svg · 18.8KB)",
+                  summary: "已在 sota:/root/code/worktrees/task-445-pi-coder/pelican-bicycle.svg 完成绘制（含大嘴囊里的小鱼、红围巾、翅膀扶车把、双脚踩踏板、辐条与链条），并通过 xmllint 与 cairosvg 渲染验证。<div style='margin-top:8px;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;background:#fff;'><img src='http://127.0.0.1:4100/api/pelican.svg' style='width:100%;display:block;' alt='pelican-bicycle.svg'/></div>"
+                },
+                attention: null,
+                currentThought: "已完成 pelican-bicycle.svg 绘制与 XML/PNG 渲染自检，已上报 Verdict=ready 交付！",
+                runSummary: "已完成 · pelican-bicycle.svg (18,853 bytes)",
+                steps: [
+                  { badge: "步骤", text: "[新建会话] 初始化工作区 /root/code/worktrees/task-445-pi-coder" },
+                  { badge: "步骤", text: "[模型路由] dev-leader (gemini-4-argon-high) 派单 -> pi-coder (deepseek-v4.1-flash) 执行" },
+                  { badge: "步骤", text: "[sota 工具调用 · write] /root/code/worktrees/task-445-pi-coder/pelican-bicycle.svg (18,853 bytes)" },
+                  { badge: "步骤", text: "[sota 工具调用 · bash] xmllint --noout pelican-bicycle.svg && cairosvg 渲染验证通过" },
+                  { badge: "report", text: "[结构化上报] nocturn report --task TASK-445 --agent pi-coder --state ready --summary '已完成鹈鹕骑自行车 SVG 绘制与验证'" }
+                ]
+              },
+              {
                 taskId: "p438",
                 taskCode: "TASK-438",
                 taskTitle: "#438 编写 calc.js 斐波那契与四则运算模块并通过单测",
@@ -1470,6 +1493,20 @@
     ];
 
     const pills = [
+      {
+        id: "p445",
+        squadId: "dev",
+        identifier: "TASK-445",
+        status: "待审核",
+        dotType: "in_review",
+        title: "#445 画个鹈鹕骑自行车的s v g",
+        badgeText: "🎨 真机已画完",
+        badgeClass: "ready",
+        links: [
+          { actorId: "dev-leader", type: "waiting" },
+          { actorId: "pi-coder", type: "running" }
+        ]
+      },
       {
         id: "p438",
         squadId: "dev",

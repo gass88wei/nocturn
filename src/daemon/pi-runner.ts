@@ -276,19 +276,23 @@ export class SotaPiRunner {
               `正在执行 ${toolName}: ${argSummary}`
             );
           } else if (ev.type === "message_end" && ev.message?.role === "assistant") {
+            let stepText = "";
             for (const part of ev.message.content ?? []) {
-              if (part.type === "text") assistantText += part.text;
+              if (part.type === "text") stepText += part.text;
             }
-            if (params.runId && assistantText.trim()) {
-              this.engine.markDeliveredInputsReadForRun(params.runId);
-              this.engine.appendRunStep(
-                params.runId,
-                {
-                  badge: "步骤",
-                  text: `[sota Pi 1.5.0 回复] ${assistantText.trim()}`,
-                },
-                `已完成回复：${assistantText.trim().slice(0, 50)}`
-              );
+            if (stepText.trim()) {
+              assistantText = stepText.trim();
+              if (params.runId) {
+                this.engine.markDeliveredInputsReadForRun(params.runId);
+                this.engine.appendRunStep(
+                  params.runId,
+                  {
+                    badge: "步骤",
+                    text: `[sota Pi 1.5.0 回复] ${assistantText}`,
+                  },
+                  `已完成回复：${assistantText.slice(0, 50)}`
+                );
+              }
             }
           }
         } catch {

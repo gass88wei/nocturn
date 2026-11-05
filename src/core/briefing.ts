@@ -75,6 +75,7 @@ export function buildWorkerBriefing(params: {
     : "";
 
   return `你是执行组员 ${worker.name} (${worker.id})，职责：${worker.instructions}
+核心收敛铁律（Stop by impact, not by effort）：完成核心文件/代码编写并做 1 次验证通过后，**必须立即调用 \`nocturn report --state ready\` 交付并结束回合**！严禁反复截图或微调超过 2 轮！
 
 ## 当前任务
 - 任务号：${task.identifier} (内部 ID: ${task.id})

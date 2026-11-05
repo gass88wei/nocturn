@@ -243,6 +243,16 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/pelican.svg") {
+        const svgContent = readFileSync(join(__dirname, "../../pelican-bicycle.svg"), "utf8");
+        res.writeHead(200, {
+          "Content-Type": "image/svg+xml; charset=utf-8",
+          "Access-Control-Allow-Origin": "*",
+        });
+        res.end(svgContent);
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/agents") {
         const body = await readJsonBody(req);
         const agent = engine.upsertAgent({
