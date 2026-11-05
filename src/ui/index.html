@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Nocturn — 多智能体实时态势与任务工作台</title>
+  <title>Nocturn — 按任务组织的多智能体工作台 (Multica 架构 + 浅色风格)</title>
   <style>
     :root {
       color-scheme: light;
@@ -11,7 +11,7 @@
       --bg-main: #ffffff;
       --bg-sidebar: #f6f7f9;
       --bg-hover: #eef0f4;
-      --bg-now-active: #dfe6ff;
+      --bg-active: #dfe6ff;
       --text-primary: #1f2329;
       --text-secondary: #646a73;
       --text-muted: #8f959e;
@@ -39,72 +39,23 @@
 
     .workspace-frame {
       display: grid;
-      grid-template-columns: 44px 212px minmax(0, 1fr);
+      grid-template-columns: 218px minmax(0, 1fr);
       height: 100vh;
       background: var(--bg-app);
     }
     .workspace-frame.sidebar-collapsed {
-      grid-template-columns: 44px 0px minmax(0, 1fr);
+      grid-template-columns: 0px minmax(0, 1fr);
     }
-    .workspace-frame.sidebar-collapsed .contacts-pane {
+    .workspace-frame.sidebar-collapsed .app-sidebar {
       overflow: hidden;
       padding: 0;
       border-right: none;
     }
 
-    /* 1. 左侧窄图标栏 */
-    .rail {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 14px 0;
-      gap: 10px;
-      border-right: 1px solid var(--border-subtle);
-      background: var(--bg-sidebar);
-      user-select: none;
-    }
-    .rail-logo {
-      width: 30px;
-      height: 30px;
-      border-radius: 9px;
-      background: #1e1b4b;
-      color: #fff;
-      font-weight: 800;
-      font-size: 13px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 4px;
-      position: relative;
-      cursor: pointer;
-    }
-    .rail-logo::after {
-      content: "";
-      position: absolute;
-      top: -2px;
-      right: -2px;
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #22c55e;
-      border: 1.5px solid var(--bg-sidebar);
-    }
-    .rail-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #646a73;
-      cursor: pointer;
-    }
-    .rail-icon:hover { background: var(--bg-hover); color: var(--text-primary); }
-    .rail-icon.active { background: #e0e7ff; color: #4f46e5; }
-    .rail-spacer { flex: 1; }
-
-    /* 2. 二级导航侧边栏（保留你的柔和浅色 UI 风格 + Multica 原版核心导航能力） */
-    .contacts-pane {
+    /* ============================================================================
+       1. 左侧导航栏（严格对齐 Multica `app-sidebar.tsx` 的按任务组织结构，保留你的浅色柔和风格）
+       ============================================================================ */
+    .app-sidebar {
       background: var(--bg-sidebar);
       padding: 14px 10px;
       display: flex;
@@ -114,28 +65,45 @@
       user-select: none;
       overflow-y: auto;
     }
-    .contacts-header {
+    .sidebar-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 4px 2px;
+      padding: 0 4px 4px;
     }
-    .contacts-title {
-      font-size: 16px;
+    .workspace-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15.5px;
       font-weight: 700;
       color: #111827;
-      margin: 0;
     }
-    .collapse-btn {
-      color: #8f959e;
-      cursor: pointer;
-      padding: 4px;
-      border-radius: 6px;
+    .brand-logo {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      background: #1e1b4b;
+      color: #fff;
+      font-weight: 800;
+      font-size: 12px;
       display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
     }
-    .collapse-btn:hover { background: var(--bg-hover); }
+    .brand-logo::after {
+      content: "";
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 6.5px;
+      height: 6.5px;
+      border-radius: 50%;
+      background: #22c55e;
+      border: 1.5px solid var(--bg-sidebar);
+    }
 
-    /* Multica 原版顶部 "+ 新建任务" 按钮 */
     .new-issue-btn {
       display: flex;
       align-items: center;
@@ -154,38 +122,42 @@
     }
     .new-issue-btn:hover { background: #4338ca; }
 
-    .primary-nav-btn {
+    .nav-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      border-radius: 10px;
-      padding: 7px 10px;
+      border-radius: 9px;
+      padding: 6.5px 9px;
       cursor: pointer;
       font-size: 12.5px;
       font-weight: 600;
       color: #374151;
       transition: all 0.12s;
     }
-    .primary-nav-btn:hover { background: #e8ebf0; }
-    .primary-nav-btn.active {
-      background: var(--bg-now-active);
+    .nav-item:hover { background: #e8ebf0; }
+    .nav-item.active {
+      background: var(--bg-active);
       color: #1e1b4b;
     }
-    .primary-nav-count {
-      font-size: 11px;
+    .nav-count {
+      font-size: 10.5px;
       font-weight: 700;
       padding: 1px 6px;
       border-radius: 99px;
       background: rgba(79, 70, 229, 0.12);
       color: #4f46e5;
     }
+    .nav-count.warn {
+      background: #fef3c7;
+      color: #b45309;
+    }
 
     .group-title {
-      font-size: 11px;
-      font-weight: 600;
+      font-size: 10.5px;
+      font-weight: 700;
       color: #8f959e;
-      padding: 8px 4px 2px;
+      padding: 8px 6px 2px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -196,25 +168,25 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 5px 6px;
-      border-radius: 9px;
+      padding: 5px 7px;
+      border-radius: 8px;
       cursor: pointer;
       border: 1px solid transparent;
     }
     .nav-row:hover { background: #e8ebf0; }
     .nav-row.active {
-      background: #dfe6ff;
+      background: var(--bg-active);
       border-color: #c7d2fe;
     }
-    .member-avatar-wrap { position: relative; width: 26px; height: 26px; flex-shrink: 0; }
+    .member-avatar-wrap { position: relative; width: 24px; height: 24px; flex-shrink: 0; }
     .member-avatar {
-      width: 26px; height: 26px; border-radius: 50%;
+      width: 24px; height: 24px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 9.5px; color: #fff;
+      font-weight: 700; font-size: 9px; color: #fff;
     }
     .online-dot {
       position: absolute; right: -1px; bottom: -1px;
-      width: 7.5px; height: 7.5px; border-radius: 50%;
+      width: 7px; height: 7px; border-radius: 50%;
       background: var(--green-online); border: 1.5px solid var(--bg-sidebar);
     }
     .nav-meta { min-width: 0; flex: 1; }
@@ -229,13 +201,15 @@
     }
     .role-badge {
       display: inline-flex; align-items: center;
-      font-size: 9px; font-weight: 600; color: #646a73;
+      font-size: 8.5px; font-weight: 600; color: #646a73;
       background: #e5e7eb; border-radius: 4px; padding: 0 4px;
     }
     .role-badge.leader { color: #4f46e5; background: #e0e7ff; }
     .role-badge.worker { color: #1d4ed8; background: #dbeafe; }
 
-    /* 3. 主工作台容器 */
+    /* ============================================================================
+       2. 主工作台区域（Multica `IssueSurface` 顶栏 + 列表/看板/Now二部图 + 任务详情）
+       ============================================================================ */
     .main-surface {
       background: var(--bg-main);
       margin: 6px 6px 6px 0;
@@ -247,31 +221,98 @@
       overflow: hidden;
     }
 
-    .center-stage-pane {
+    .surface-column {
       flex: 1;
       min-width: 0;
-      padding: 16px 20px 24px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* Multica `issues-header.tsx` 顶栏：左侧面包屑/筛选 + 中间正在工作的 Agent 胶囊 + 右侧视图模式切换 (列表 / 看板 / Now二部图) */
+    .surface-header {
+      padding: 10px 18px;
+      border-bottom: 1px solid #ebedf0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: #ffffff;
+      flex-shrink: 0;
+    }
+    .surface-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .surface-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #111827;
+      margin: 0;
+    }
+    .working-agent-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      cursor: pointer;
+    }
+    .view-mode-switcher {
+      display: inline-flex;
+      background: #f1f5f9;
+      padding: 2px;
+      border-radius: 8px;
+      gap: 2px;
+    }
+    .mode-btn {
+      border: none;
+      background: transparent;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+    }
+    .mode-btn.active {
+      background: #ffffff;
+      color: #1e1b4b;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+
+    .surface-body {
+      flex: 1;
       overflow-y: auto;
+      padding: 14px 18px 24px;
       display: flex;
       flex-direction: column;
       gap: 14px;
     }
 
-    /* 顶部快速派单栏 */
+    /* 顶部快速派单输入条 */
     .dispatch-bar {
       display: flex;
       align-items: center;
       gap: 8px;
       background: #f5f7ff;
       border: 1px solid #c7d2fe;
-      border-radius: 11px;
-      padding: 7px 11px;
+      border-radius: 10px;
+      padding: 6px 10px;
+      flex-shrink: 0;
     }
     .dispatch-bar input {
       flex: 1;
-      height: 30px;
+      height: 29px;
       border: 1px solid #d1d5db;
-      border-radius: 7px;
+      border-radius: 6px;
       padding: 0 10px;
       font-size: 12px;
       background: #fff;
@@ -281,81 +322,134 @@
     .dispatch-bar input:focus { border-color: #4f46e5; }
 
     /* ============================================================================
-       视图 A：你的标志性「实时态势二部图 (Now — 谁正在干什么)」
+       模式 1：Multica 默认分组列表视图 (`list-view.tsx`，按状态分组：进行中 / 待审核 / 已完成)
+       ============================================================================ */
+    .status-group-section {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #ffffff;
+      overflow: hidden;
+    }
+    .status-group-header {
+      padding: 8px 14px;
+      background: #f8f9fb;
+      border-bottom: 1px solid #ebedf0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: #374151;
+    }
+    .issue-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 14px;
+      border-bottom: 1px solid #f3f4f6;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .issue-row:last-child { border-bottom: none; }
+    .issue-row:hover { background: #f8fafc; }
+    .issue-row.selected { background: #f5f7ff; }
+    .issue-row-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+    .issue-code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px; font-weight: 700; color: #4f46e5;
+      background: #eef2ff; padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+    }
+    .issue-row-title {
+      font-size: 12.5px; font-weight: 600; color: #111827;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .issue-row-summary {
+      font-size: 11px; color: #64748b;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px;
+    }
+    .issue-row-right { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+
+    /* ============================================================================
+       模式 2：Multica 看板列视图 (`board-view.tsx`)
+       ============================================================================ */
+    .board-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+    .board-col {
+      background: #f8f9fb;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 360px;
+    }
+    .board-col-header {
+      font-size: 12px;
+      font-weight: 700;
+      color: #374151;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2px 4px 6px;
+      border-bottom: 1px dashed #e2e5ec;
+    }
+    .board-card {
+      background: #ffffff;
+      border: 1px solid #e2e5ec;
+      border-radius: 10px;
+      padding: 10px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+    }
+    .board-card:hover { border-color: #6366f1; }
+    .board-card.selected { border-color: #4f46e5; background: #f5f7ff; }
+
+    /* ============================================================================
+       模式 3：你的标志性「实时态势二部图 (Now — 谁正在干什么)」
        ============================================================================ */
     .now-card {
       background: #ffffff;
       border: 1px solid var(--border-card);
-      border-radius: 16px;
-      padding: 16px 18px;
+      border-radius: 14px;
+      padding: 14px 16px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
     }
-    .stats-header {
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-    .stats-left { display: flex; align-items: flex-end; gap: 24px; }
-    .stat-block .stat-num {
-      font-size: 28px; font-weight: 600; line-height: 1;
-      color: #1f2329; font-variant-numeric: tabular-nums;
-    }
-    .stat-block .stat-caption { font-size: 11px; color: #646a73; margin-top: 3px; }
-    .legend-bar {
-      display: flex; align-items: center; flex-wrap: wrap;
-      gap: 12px; font-size: 11px; color: #646a73;
-    }
-    .legend-tag { display: inline-flex; align-items: center; gap: 5px; }
-
     .bipartite-stage {
       position: relative;
       display: grid;
-      grid-template-columns: 196px minmax(65px, 14%) minmax(220px, 1fr);
-      min-height: 350px;
+      grid-template-columns: 192px minmax(60px, 14%) minmax(210px, 1fr);
+      min-height: 320px;
       align-items: start;
     }
-    .left-column {
-      grid-column: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      z-index: 2;
-    }
+    .left-column { grid-column: 1; display: flex; flex-direction: column; gap: 10px; z-index: 2; }
     .squad-pod {
-      background: #f8f9fb;
-      border: 1px solid #e5e7eb;
-      border-radius: 11px;
-      padding: 6px 8px 7px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+      background: #f8f9fb; border: 1px solid #e5e7eb;
+      border-radius: 11px; padding: 6px 8px 7px; display: flex; flex-direction: column; gap: 4px;
     }
-    .squad-pod.focused-pod { border-color: #6366f1; background: #f5f7ff; }
-    .squad-pod.dimmed-pod { opacity: 0.4; }
     .squad-pod-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 2px 2px 4px; border-bottom: 1px dashed #e2e5ec;
-      cursor: pointer;
+      padding: 2px 2px 4px; border-bottom: 1px dashed #e2e5ec; cursor: pointer;
     }
-    .squad-pod-name {
-      display: inline-flex; align-items: center; gap: 5px;
-      font-size: 10.5px; font-weight: 700; color: #374151;
-    }
+    .squad-pod-name { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: #374151; }
     .squad-pod-dot { width: 6px; height: 6px; border-radius: 2px; }
     .squad-pod-tag { font-size: 9px; color: #646a73; background: #eef0f4; padding: 1px 5px; border-radius: 99px; }
 
     .actor-node {
       display: flex; align-items: center; justify-content: space-between;
       padding: 3px 4px; border-radius: 7px; cursor: pointer;
-      border: 1px solid transparent;
     }
     .actor-node:hover { background: #eef0f4; }
-    .actor-node.selected-actor { background: #e0e7ff; border-color: #818cf8; }
-    .actor-node.dimmed-actor { opacity: 0.38; }
     .actor-node.worker-indent { padding-left: 9px; position: relative; }
     .actor-node.worker-indent::before {
       content: ""; position: absolute; left: 3px; top: -3px; bottom: 50%;
@@ -369,28 +463,16 @@
     }
     .actor-name { font-size: 11.5px; font-weight: 600; color: #1f2329; white-space: nowrap; }
     .actor-sub { font-size: 9.5px; color: #8f959e; white-space: nowrap; }
-    .origin-dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: var(--purple-line); flex-shrink: 0;
-    }
+    .origin-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--purple-line); flex-shrink: 0; }
     .origin-dot.blue { background: var(--blue-line); }
 
-    .right-column {
-      grid-column: 3; display: flex; flex-direction: column;
-      gap: 7px; z-index: 2; min-width: 0; padding-top: 2px;
-    }
+    .right-column { grid-column: 3; display: flex; flex-direction: column; gap: 7px; z-index: 2; min-width: 0; padding-top: 2px; }
     .task-pill {
       height: 33px; background: #fff; border: 1px solid #e2e5ec;
       border-radius: 8px; padding: 0 9px;
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 6px; cursor: pointer;
+      display: flex; align-items: center; justify-content: space-between; gap: 6px; cursor: pointer;
     }
-    .task-pill.selected-pill {
-      border-color: #4f46e5;
-      background: #f5f7ff;
-      box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.14);
-    }
-    .task-pill.dimmed-pill { opacity: 0.35; }
+    .task-pill.selected-pill { border-color: #4f46e5; background: #f5f7ff; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.14); }
     .task-pill:hover { border-color: #6366f1; }
     .task-pill-left { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
     .task-dot { width: 6.5px; height: 6.5px; border-radius: 50%; flex-shrink: 0; }
@@ -398,6 +480,199 @@
     .task-dot.dispatching { background: var(--purple-line); }
     .task-dot.in_review { background: #10b981; }
     .task-title { font-size: 11.5px; color: #1f2329; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .curves-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+
+    /* ============================================================================
+       3. 右侧任务详情面板（100% 按任务组织的 Multica `IssuePeekPanel` / `IssueDetail`：
+          顶部属性栏 + Deliverables 交付物与源码查看器 + 按回合分组的 CommentCard & InlineCommentRun 时间线）
+       ============================================================================ */
+    .task-detail-drawer {
+      width: 460px;
+      border-left: 1px solid #e5e7eb;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      flex-shrink: 0;
+      transition: width 0.15s ease;
+    }
+    .task-detail-drawer.expanded-full {
+      width: calc(100vw - 230px);
+    }
+
+    .drawer-topbar {
+      padding: 10px 14px;
+      border-bottom: 1px solid #ebedf0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: #fafbfc;
+    }
+    .drawer-props-bar {
+      padding: 7px 14px;
+      border-bottom: 1px solid #f0f1f4;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      background: #ffffff;
+    }
+    .prop-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 6px;
+      border: 1px solid #e2e5ec;
+      background: #f8fafc;
+      color: #374151;
+      cursor: pointer;
+    }
+    .prop-pill:hover { background: #eef0f4; }
+
+    .drawer-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .drawer-task-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #111827;
+      margin: 0;
+      line-height: 1.35;
+    }
+
+    /* Multica `DeliverablesSection`：任务交付产物与工作区真实源码查看器 */
+    .deliverables-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      background: #f8fafc;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .deliverables-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .file-pills-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .file-pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #1e293b;
+      cursor: pointer;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .file-pill:hover { border-color: #6366f1; }
+    .file-pill.active { background: #1e1b4b; color: #fff; border-color: #1e1b4b; }
+
+    .code-viewer-box {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      max-height: 220px;
+      overflow: auto;
+      white-space: pre;
+    }
+
+    /* Multica `CommentCard` + `InlineCommentRun`（按每个 Agent 回合一张独立卡片，步骤默认收起！） */
+    .turn-comment-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #ffffff;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .turn-comment-header {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11.5px;
+    }
+    .turn-author { font-weight: 700; color: #111827; }
+    .turn-model-tag {
+      font-size: 9.5px;
+      color: #64748b;
+      background: #f1f5f9;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .turn-stage-badge {
+      margin-left: auto;
+      font-size: 10px;
+      font-weight: 600;
+      color: #4f46e5;
+      background: #eef2ff;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .turn-comment-body {
+      font-size: 12px;
+      color: #334155;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    /* 内嵌在每条评论下方的折叠式 InlineCommentRun 条 */
+    .inline-run-bar {
+      border: 1px solid #e2e8f0;
+      border-radius: 7px;
+      background: #f8fafc;
+      overflow: hidden;
+    }
+    .inline-run-summary-row {
+      padding: 5px 9px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+      user-select: none;
+    }
+    .inline-run-summary-row:hover { background: #f1f5f9; }
+    .inline-run-steps-list {
+      border-top: 1px solid #e2e8f0;
+      padding: 6px 9px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10.5px;
+      color: #475569;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
     .verdict-mini-badge {
       font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;
     }
@@ -410,344 +685,19 @@
       border: 1px solid #c7d2fe; color: #4338ca; background: #eef2ff;
       cursor: pointer; flex-shrink: 0;
     }
-    .issue-bind-chip:hover { background: #e0e7ff; }
-    .open-detail-chip {
-      font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;
-      background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;
-      cursor: pointer; flex-shrink: 0;
-    }
-    .open-detail-chip:hover { background: #1e1b4b; color: #fff; border-color: #1e1b4b; }
-
-    .curves-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
-
-    /* ============================================================================
-       视图 B：借鉴 Multica 原版 `issues/page.tsx` 分组看板列表视图
-       ============================================================================ */
-    .issues-board-card {
-      background: #ffffff;
-      border: 1px solid var(--border-card);
-      border-radius: 14px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-    .issues-filter-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 14px;
-      border-bottom: 1px solid #f0f1f4;
-      background: #fafbfc;
-    }
-    .filter-tabs { display: flex; gap: 6px; }
-    .filter-tab {
-      font-size: 11.5px; font-weight: 600; padding: 4px 10px;
-      border-radius: 6px; cursor: pointer; color: #646a73;
-    }
-    .filter-tab:hover { background: #eef0f4; }
-    .filter-tab.active { background: #1e1b4b; color: #fff; }
-
-    .issue-row {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 10px; padding: 11px 14px; border-bottom: 1px solid #f3f4f6;
-      cursor: pointer; transition: background 0.1s;
-    }
-    .issue-row:hover { background: #f8fafc; }
-    .issue-row-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-    .issue-code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 11px; font-weight: 700; color: #4f46e5;
-      background: #eef2ff; padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
-    }
-    .issue-row-title {
-      font-size: 13px; font-weight: 600; color: #111827;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .issue-row-summary {
-      font-size: 11.5px; color: #64748b;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 340px;
-    }
-    .issue-row-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     .del-btn {
       border: none; background: transparent; color: #9ca3af;
       cursor: pointer; font-size: 12px; padding: 2px 5px; border-radius: 4px;
     }
     .del-btn:hover { background: #fee2e2; color: #dc2626; }
 
-    /* ============================================================================
-       视图 C：借鉴 Multica 原版 `issue-detail.tsx` 的双栏全屏任务详情工作台！
-       （左侧主栏：四棒进度条 + 分棒 InlineCommentRun 卡片 + 完整审查结论 + 评论框；
-         右侧属性与文件栏：属性选择器 + 真实 sota 工作区文件与代码/SVG 查看器）
-       ============================================================================ */
-    .multica-issue-detail {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 330px;
-      height: 100%;
-      width: 100%;
-      overflow: hidden;
-    }
-    .detail-main-col {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      overflow: hidden;
-      border-right: 1px solid #ebedf0;
-    }
-    .detail-topbar {
-      padding: 11px 18px;
-      border-bottom: 1px solid #ebedf0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: #fafbfc;
-    }
-    .detail-breadcrumb {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12.5px;
-      font-weight: 600;
-      color: #4b5563;
-    }
-    .detail-scroll {
-      flex: 1;
-      overflow-y: auto;
-      padding: 18px 22px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .detail-title {
-      font-size: 19px;
-      font-weight: 700;
-      color: #111827;
-      margin: 0;
-      line-height: 1.35;
-    }
-
-    /* 四棒接力进度条 */
-    .relay-stepper {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 10px 12px;
-    }
-    .relay-step-item {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      padding: 6px 8px;
-      border-radius: 8px;
-      background: #ffffff;
-      border: 1px solid #e5e7eb;
-    }
-    .relay-step-item.done { border-color: #a7f3d0; background: #ecfdf5; }
-    .relay-step-item.running { border-color: #93c5fd; background: #eff6ff; }
-    .relay-step-title { font-size: 11px; font-weight: 700; color: #1e293b; }
-    .relay-step-sub { font-size: 10px; color: #64748b; }
-
-    /* Multica 原版风格的分棒 CommentCard + InlineCommentRun */
-    .stage-run-card {
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      background: #ffffff;
-      overflow: hidden;
-    }
-    .stage-run-header {
-      padding: 10px 14px;
-      background: #f8f9fb;
-      border-bottom: 1px solid #ebedf0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      cursor: pointer;
-    }
-    .stage-run-body {
-      padding: 12px 14px;
-      font-size: 12.5px;
-      color: #1f2329;
-      line-height: 1.55;
-      white-space: pre-wrap;
-    }
-    .stage-run-steps {
-      border-top: 1px dashed #e2e8f0;
-      padding: 8px 14px;
-      background: #fcfcfd;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 11px;
-      color: #475569;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    /* 右侧 330px 属性与真实 sota 文件查看栏 */
-    .detail-inspector-col {
-      background: #fafbfc;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      overflow-y: auto;
-      padding: 14px;
-      gap: 14px;
-    }
-    .prop-section {
-      background: #ffffff;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 9px;
-    }
-    .prop-section-title {
-      font-size: 11.5px;
-      font-weight: 700;
-      color: #374151;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .prop-kv {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 11.5px;
-    }
-    .prop-k { color: #64748b; }
-    .prop-v { font-weight: 600; color: #1f2329; }
-
-    .file-tab-btn {
-      padding: 5px 8px;
-      border-radius: 6px;
-      border: 1px solid #e2e8f0;
-      background: #f8fafc;
-      font-size: 11px;
-      font-weight: 600;
-      color: #1e293b;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .file-tab-btn:hover { border-color: #94a3b8; }
-    .file-tab-btn.active { background: #eef2ff; border-color: #818cf8; color: #3730a3; }
-
-    .code-viewer-box {
-      background: #0f172a;
-      color: #e2e8f0;
-      border-radius: 8px;
-      padding: 10px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 11px;
-      line-height: 1.45;
-      max-height: 310px;
-      overflow: auto;
-      white-space: pre;
-    }
-
-    /* Now 视图右侧的轻量伴随式抽屉 */
-    .issue-peek-panel {
-      width: 350px;
-      border-left: 1px solid #e5e7eb;
-      background: #ffffff;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      flex-shrink: 0;
-    }
-    .peek-header {
-      padding: 9px 12px;
-      border-bottom: 1px solid #ebedf0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-    }
-    .peek-mode-badge {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: 5px;
-      background: #dbeafe;
-      color: #1d4ed8;
-    }
-    .peek-props-bar {
-      padding: 6px 12px;
-      border-bottom: 1px solid #f0f1f4;
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 5px;
-      background: #fafbfc;
-    }
-    .prop-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 10.5px;
-      font-weight: 600;
-      padding: 2.5px 8px;
-      border-radius: 999px;
-      border: 1px solid #e2e5ec;
-      background: #ffffff;
-      color: #4b5563;
-      cursor: pointer;
-    }
-    .prop-pill:hover { background: #f3f4f6; }
-    .prop-pill.active-tab { background: #1e1b4b; color: #fff; border-color: #1e1b4b; }
-
-    .peek-scroll {
-      flex: 1;
-      overflow-y: auto;
-      padding: 11px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 9px;
-    }
-    .peek-issue-title { font-size: 13.5px; font-weight: 700; color: #111827; margin: 0; line-height: 1.3; }
-    .verdict-box {
-      border-radius: 8px; padding: 8px 10px;
-      border: 1px solid #cbd5e1; background: #f8fafc; font-size: 11.5px;
-    }
-    .verdict-box.ready { background: #ecfdf5; border-color: #a7f3d0; }
-    .verdict-box.progress { background: #eff6ff; border-color: #bfdbfe; }
-    .verdict-header {
-      display: flex; align-items: center; justify-content: space-between;
-      font-size: 10.5px; font-weight: 700; margin-bottom: 4px;
-    }
-    .verdict-summary { font-size: 11px; color: #334155; line-height: 1.45; }
-
-    .compact-run-box { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fff; }
-    .compact-run-header {
-      padding: 6px 9px; background: #f8fafc;
-      display: flex; align-items: center; justify-content: space-between;
-      font-size: 11px; font-weight: 600; color: #1e293b; cursor: pointer;
-    }
-    .compact-steps-list {
-      max-height: 185px; overflow-y: auto; padding: 6px 8px;
-      border-top: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 4px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: #475569;
-    }
-    .compact-step-row { display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .compact-step-badge {
-      font-size: 9px; padding: 0 4px; border-radius: 3px;
-      background: #f1f5f9; color: #475569; font-weight: 600; flex-shrink: 0;
-    }
-    .compact-step-badge.report { background: #dcfce7; color: #15803d; }
-    .compact-step-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
     .sticky-composer {
-      border-top: 1px solid #ebedf0; padding: 8px 12px;
+      border-top: 1px solid #ebedf0; padding: 9px 12px;
       background: #ffffff; display: flex; flex-direction: column; gap: 6px;
     }
     .composer-textarea {
-      width: 100%; height: 46px; border: 1px solid #d1d5db;
-      border-radius: 7px; padding: 5px 8px; font-size: 12px;
+      width: 100%; height: 48px; border: 1px solid #d1d5db;
+      border-radius: 7px; padding: 6px 8px; font-size: 12px;
       font-family: inherit; resize: none; outline: none;
     }
     .composer-textarea:focus { border-color: #4f46e5; }
@@ -769,9 +719,7 @@
     }
     .pill-btn:hover { background: #f9fafb; }
 
-    /* ============================================================================
-       借鉴 Multica 原版 `create-issue-dialog.tsx` 的新建任务弹窗
-       ============================================================================ */
+    /* 新建任务弹窗 */
     .modal-backdrop {
       position: fixed; inset: 0; background: rgba(15, 23, 42, 0.35);
       display: none; align-items: center; justify-content: center; z-index: 100;
@@ -801,180 +749,136 @@
 </head>
 <body>
   <div class="workspace-frame" id="workspaceFrame">
-    <!-- 1. 最左侧窄栏 -->
-    <nav class="rail">
-      <div class="rail-logo" title="实时态势 (Now)" onclick="switchCenterTab('now')">N</div>
-      <div class="rail-icon active" id="railNowBtn" title="实时态势 (Now)" onclick="switchCenterTab('now')">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-      </div>
-      <div class="rail-icon" id="railIssuesBtn" title="任务看板 (Issues)" onclick="switchCenterTab('issues')">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7h8"/><path d="M8 12h8"/><path d="M8 17h5"/></svg>
-      </div>
-      <div class="rail-spacer"></div>
-      <div class="rail-icon" id="toggleSidebarRailBtn" title="展开/收起侧边栏">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
-      </div>
-    </nav>
-
-    <!-- 2. 二级导航侧边栏 -->
-    <aside class="contacts-pane">
-      <div class="contacts-header">
-        <h2 class="contacts-title">Nocturn</h2>
-        <div class="collapse-btn" id="collapseSidebarBtn" title="收起侧边栏">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+    <!-- 1. 左侧导航栏（完全借鉴 Multica `app-sidebar.tsx`：一切以任务 Issues 为中心，点小队或智能体也是筛选它负责的任务！） -->
+    <aside class="app-sidebar">
+      <div class="sidebar-header">
+        <div class="workspace-brand">
+          <div class="brand-logo">N</div>
+          <span>Nocturn 工作区</span>
         </div>
       </div>
 
-      <!-- 借鉴 Multica 原版：醒目的 "+ 新建任务" 弹窗按钮 -->
       <button class="new-issue-btn" onclick="openCreateIssueModal()">＋ 新建任务 (New Issue)</button>
 
-      <div class="primary-nav-btn active" id="navBtnNow" onclick="switchCenterTab('now')">
-        <span>⚡ 实时态势 (Now)</span>
-        <span class="primary-nav-count" id="navCountNow">4</span>
+      <div class="group-title"><span>工作区 (按任务组织)</span></div>
+      <div class="nav-item active" id="navAllIssues" onclick="setSidebarFilter('all')">
+        <span>📋 全部任务 (Issues)</span>
+        <span class="nav-count" id="countAllIssues">4</span>
       </div>
-      <div class="primary-nav-btn" id="navBtnIssues" onclick="switchCenterTab('issues')">
-        <span>📋 任务看板 (Issues)</span>
-        <span class="primary-nav-count" id="navCountIssues">4</span>
+      <div class="nav-item" id="navActiveIssues" onclick="setSidebarFilter('active')">
+        <span>🟢 进行中 (In Progress)</span>
+        <span class="nav-count" id="countActiveIssues">0</span>
+      </div>
+      <div class="nav-item" id="navInboxIssues" onclick="setSidebarFilter('inbox')">
+        <span>📥 待我审核 (Inbox)</span>
+        <span class="nav-count warn" id="countInboxIssues">1</span>
+      </div>
+      <div class="nav-item" id="navDoneIssues" onclick="setSidebarFilter('done')">
+        <span>✅ 已自动结单 (Done)</span>
+        <span class="nav-count" id="countDoneIssues">3</span>
       </div>
 
-      <div class="group-title"><span>小队 (点击聚焦)</span><span>2</span></div>
+      <div class="group-title"><span>按小队筛选任务 (Squads)</span></div>
       <div class="nav-list">
-        <div class="nav-row" data-left-key="squad:dev" onclick="selectSquadLeader('dev')">
-          <div class="member-avatar" style="background:#4f46e5;border-radius:7px;">研</div>
+        <div class="nav-row" id="navSquad_dev" onclick="setSidebarFilter('squad:dev')">
+          <div class="member-avatar" style="background:#4f46e5;border-radius:6px;">研</div>
           <div class="nav-meta">
             <div class="nav-name">研发小队</div>
-            <div class="nav-desc">队长 + Coder + Reviewer</div>
+            <div class="nav-desc">队长 + pi-coder + reviewer</div>
           </div>
         </div>
-        <div class="nav-row" data-left-key="squad:ops" onclick="selectSquadLeader('ops')">
-          <div class="member-avatar" style="background:#7c3aed;border-radius:7px;">运</div>
+        <div class="nav-row" id="navSquad_ops" onclick="setSidebarFilter('squad:ops')">
+          <div class="member-avatar" style="background:#7c3aed;border-radius:6px;">运</div>
           <div class="nav-meta">
             <div class="nav-name">实验与运维小队</div>
-            <div class="nav-desc">1 队长 + 1 组员</div>
+            <div class="nav-desc">队长 + pi-bench</div>
           </div>
         </div>
       </div>
 
       <div class="group-title">
-        <span>长期智能体 (sota)</span>
+        <span>按智能体筛选任务 (sota)</span>
         <span style="cursor:pointer;color:#4f46e5;" onclick="promptAddAgent()">+ 新增</span>
       </div>
       <div class="nav-list" id="sidebarAgentsList"></div>
     </aside>
 
-    <!-- 3. 主面板区域 -->
+    <!-- 2. 主画面：左侧 Multica `IssueSurface`（支持分组列表 / 看板列 / Now实时连线图三种模式切换） + 右侧按任务组织的详情抽屉 -->
     <main class="main-surface">
-      <!-- 模式 1 & 2：Now 二部图 / Issues 看板列表 + 右侧伴随式抽屉 -->
-      <div class="center-stage-pane" id="centerStagePane">
-        <div class="dispatch-bar">
-          <span style="font-size:11.5px;font-weight:700;color:#3730a3;white-space:nowrap;">🟢 快速派单：</span>
-          <input id="quickIssueBindInput" style="max-width:125px;flex:none;" placeholder="🔗 绑 Issue (#12)" />
-          <input id="quickTaskInput" placeholder="输入需求（如：写一个 lru-cache.js 并通过单测），回车直接派给 sota 团队全自动交付..." />
-          <button class="send-btn" style="height:30px;white-space:nowrap;" onclick="submitLiveTaskFromBar()">🚀 派单给 sota</button>
+      <div class="surface-column">
+        <!-- Multica `issues-header.tsx` 顶栏 -->
+        <header class="surface-header">
+          <div class="surface-header-left">
+            <h1 class="surface-title" id="surfaceHeaderTitle">📋 全部任务 (Issues)</h1>
+            <span class="working-agent-chip" onclick="setSurfaceMode('now')" title="点击切换到实时态势二部图">
+              🟢 sota 在线 · 5 个智能体就绪
+            </span>
+          </div>
+
+          <!-- Multica 视图切换器：分组列表 (List) | 状态看板 (Board) | 实时连线 (Now) -->
+          <div class="view-mode-switcher">
+            <button class="mode-btn active" id="modeBtnList" onclick="setSurfaceMode('list')">📑 分组列表</button>
+            <button class="mode-btn" id="modeBtnBoard" onclick="setSurfaceMode('board')">📊 状态看板</button>
+            <button class="mode-btn" id="modeBtnNow" onclick="setSurfaceMode('now')">⚡ 实时态势 (Now)</button>
+          </div>
+        </header>
+
+        <div class="surface-body">
+          <!-- 快速派单栏 -->
+          <div class="dispatch-bar">
+            <span style="font-size:11.5px;font-weight:700;color:#3730a3;white-space:nowrap;">🟢 快速建单：</span>
+            <input id="quickIssueBindInput" style="max-width:120px;flex:none;" placeholder="🔗 绑 Issue (#12)" />
+            <input id="quickTaskInput" placeholder="输入新任务需求（如：写一个 debounce.js 防抖模块并通过单测），回车自动走『队长拆单 ➔ Coder编码 ➔ Reviewer审查 ➔ 自动结单』..." />
+            <button class="send-btn" style="height:29px;white-space:nowrap;" onclick="submitLiveTaskFromBar()">🚀 派单给 sota</button>
+          </div>
+
+          <!-- 容器 1：Multica 默认分组列表视图 (按 进行中 / 待审核 / 已自动结单 清晰分组) -->
+          <div id="viewContainerList" style="display:flex;flex-direction:column;gap:12px;"></div>
+
+          <!-- 容器 2：Multica 看板列视图 (三列看板) -->
+          <div id="viewContainerBoard" class="board-grid" style="display:none;"></div>
+
+          <!-- 容器 3：你的标志性「实时态势二部图 (Now)」 -->
+          <div id="viewContainerNow" class="now-card" style="display:none;">
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:#64748b;">
+              <span><strong>实时态势 (Now)</strong> — 左侧小队与智能体 ➔ 右侧任务胶囊连线图</span>
+              <div style="display:flex;gap:12px;">
+                <span>🟣 队长派单中</span>
+                <span>🔵 组员执行中</span>
+                <span>⚪ 虚线：等待回调</span>
+              </div>
+            </div>
+            <div class="bipartite-stage" id="bipartiteStage">
+              <div class="left-column" id="leftColumn"></div>
+              <svg class="curves-svg" id="curvesSvg"></svg>
+              <div class="right-column" id="rightColumn"></div>
+            </div>
+          </div>
         </div>
-
-        <!-- 视图 A：你的标志性实时态势二部图 (Now) -->
-        <section class="now-card" id="centerViewNow">
-          <div class="stats-header">
-            <div class="stats-left">
-              <div class="stat-block">
-                <div class="stat-num" id="statAgentCount">5</div>
-                <div class="stat-caption">个 sota 智能体在线</div>
-              </div>
-              <div class="stat-block">
-                <div class="stat-num" id="totalTaskCount">4</div>
-                <div class="stat-caption">个真实任务 (双击胶囊或点「⤢ 详情」进全屏工作台)</div>
-              </div>
-            </div>
-
-            <div class="legend-bar">
-              <div class="legend-tag">
-                <svg width="20" height="10" viewBox="0 0 20 10"><line x1="1" y1="5" x2="19" y2="5" stroke="#7c3aed" stroke-width="2.5" stroke-linecap="round"/></svg>
-                <span>队长派单中</span>
-              </div>
-              <div class="legend-tag">
-                <svg width="20" height="10" viewBox="0 0 20 10"><line x1="1" y1="5" x2="19" y2="5" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round"/></svg>
-                <span>组员执行中</span>
-              </div>
-              <div class="legend-tag">
-                <svg width="20" height="10" viewBox="0 0 20 10"><line x1="1" y1="5" x2="19" y2="5" stroke="#64748b" stroke-width="2" stroke-dasharray="3 3" stroke-linecap="round"/></svg>
-                <span>等待回调</span>
-              </div>
-              <button class="pill-btn" id="clearSpotlightBtn" style="display:none;" onclick="focusAllNow()">✕ 显示全部</button>
-            </div>
-          </div>
-
-          <div class="bipartite-stage" id="bipartiteStage">
-            <div class="left-column" id="leftColumn"></div>
-            <svg class="curves-svg" id="curvesSvg"></svg>
-            <div class="right-column" id="rightColumn"></div>
-          </div>
-        </section>
-
-        <!-- 视图 B：Multica 风格的任务看板列表 (Issues) -->
-        <section class="issues-board-card" id="centerViewIssues" style="display:none;">
-          <div class="issues-filter-bar">
-            <div class="filter-tabs">
-              <div class="filter-tab active" data-filter="all" onclick="setIssueFilter('all')">全部任务</div>
-              <div class="filter-tab" data-filter="active" onclick="setIssueFilter('active')">进行中</div>
-              <div class="filter-tab" data-filter="in_review" onclick="setIssueFilter('in_review')">待你拍板 (in_review)</div>
-              <div class="filter-tab" data-filter="done" onclick="setIssueFilter('done')">✅ 已结单 (Done)</div>
-            </div>
-            <span style="font-size:11px;color:#64748b;">点击任意任务进入 Multica 双栏完整详情页（看分棒记录 + 看 sota 源码文件）</span>
-          </div>
-          <div id="issuesListContainer"></div>
-        </section>
       </div>
 
-      <!-- 模式 3：借鉴 Multica 原版 `issue-detail.tsx` 的双栏全屏任务详情页（解决窄抽屉看不清代码与过程的问题！） -->
-      <div class="multica-issue-detail" id="fullIssueDetailView" style="display:none;">
-        <div class="detail-main-col">
-          <div class="detail-topbar">
-            <div class="detail-breadcrumb">
-              <button class="pill-btn" onclick="switchCenterTab('now')">← 返回实时态势 (Now)</button>
-              <button class="pill-btn" onclick="switchCenterTab('issues')">📋 任务看板</button>
-              <span id="detailTaskCode" style="color:#4f46e5;font-family:monospace;">TASK-451</span>
-            </div>
-            <div style="display:flex;gap:6px;">
-              <button class="pill-btn" style="color:#1d4ed8;background:#eff6ff;border-color:#93c5fd;" onclick="triggerLiveSotaTurn()">🚀 sota 真跑一轮</button>
-              <button class="pill-btn" onclick="triggerTargetedRework(selectedTaskId)">↩️ 驳回并定向返工 (Rework)</button>
-            </div>
+      <!-- 3. 右侧：100% 按当前选中任务组织的详情工作台（借鉴 Multica `issue-detail.tsx`：交付产物源码 + 分棒回合卡片 + 折叠步骤流） -->
+      <aside class="task-detail-drawer" id="taskDetailDrawer">
+        <div class="drawer-topbar">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="issue-code" id="drawerTaskCode">TASK-451</span>
+            <span style="font-size:11px;color:#64748b;" id="drawerWorktreeLabel">sota:/home/.../worktrees/task-451</span>
           </div>
-
-          <div class="detail-scroll" id="detailMainScroll"></div>
-
-          <div class="sticky-composer">
-            <textarea class="composer-textarea" id="detailComposerInput" placeholder="在当前任务下发表评论、向正在运行的智能体插话 (--steer)，或提出修改意见..."></textarea>
-            <div class="composer-footer">
-              <div class="trigger-chip-btn">
-                <span id="detailTriggerLabel">⚡ 插话到当前运行 (Input: delivered → read)</span>
-              </div>
-              <button class="send-btn" onclick="sendFromDetailComposer()">发送评论 / 插话 ↵</button>
-            </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button class="pill-btn" onclick="toggleDrawerExpand()" id="expandDrawerBtn" title="切换宽屏/标准抽屉宽度">⤢ 宽屏展开</button>
+            <button class="pill-btn" style="color:#1d4ed8;border-color:#93c5fd;background:#eff6ff;" onclick="triggerLiveSotaTurn()">🚀 sota 真跑一轮</button>
           </div>
         </div>
 
-        <!-- 右侧 330px：Multica 属性检查器 + 真实 sota 工作区文件与代码查看器 -->
-        <aside class="detail-inspector-col" id="detailInspectorCol"></aside>
-      </div>
+        <div class="drawer-props-bar" id="drawerPropsBar"></div>
 
-      <!-- Now 视图右侧的伴随式快览抽屉 -->
-      <aside class="issue-peek-panel" id="issuePeekPanel">
-        <div class="peek-header">
-          <span class="peek-mode-badge" id="peekModeBadge">TASK-451</span>
-          <div style="display:flex;align-items:center;gap:5px;">
-            <button class="pill-btn" style="background:#1e1b4b;color:#fff;border-color:#1e1b4b;" onclick="openFullIssueDetail(selectedTaskId)">⤢ 展开完整任务页 & 看源码</button>
-          </div>
-        </div>
-
-        <div class="peek-props-bar" id="peekPropsBar"></div>
-        <div class="peek-scroll" id="peekScroll"></div>
+        <div class="drawer-scroll" id="drawerScroll"></div>
 
         <div class="sticky-composer">
-          <textarea class="composer-textarea" id="composerInput" placeholder="向当前智能体发送插话 (--steer)..."></textarea>
+          <textarea class="composer-textarea" id="composerInput" placeholder="在此任务下发表评论、向当前智能体插话 (--steer)，或输入返工指令..."></textarea>
           <div class="composer-footer">
             <div class="trigger-chip-btn">
-              <span id="triggerChipLabel">⚡ 插话到当前运行</span>
+              <span id="triggerChipLabel">⚡ 插话到当前任务 (Input: delivered → read)</span>
             </div>
             <button class="send-btn" id="sendCommentBtn">发送 ↵</button>
           </div>
@@ -983,29 +887,25 @@
     </main>
   </div>
 
-  <!-- 借鉴 Multica 原版 `create-issue-dialog.tsx` 的新建任务弹窗 -->
+  <!-- 新建任务弹窗 -->
   <div class="modal-backdrop" id="createIssueModal" onclick="if(event.target===this)closeCreateIssueModal()">
     <div class="modal-card">
       <div style="display:flex;align-items:center;justify-content:space-between;">
-        <h3 class="modal-title">✨ 新建任务并派发给 sota 小队</h3>
+        <h3 class="modal-title">✨ 新建任务 (Create Issue)</h3>
         <button class="del-btn" onclick="closeCreateIssueModal()">✕</button>
       </div>
       <input class="modal-input" id="modalTaskTitle" placeholder="任务标题（例如：实现一个 debounce.js 防抖函数并通过单测）" />
-      <textarea class="modal-textarea" id="modalTaskDesc" placeholder="补充详细要求或验收标准（可选，队长会自动拆单委派给 pi-coder 并交由 codex-reviewer 独立复跑测试审查）..."></textarea>
+      <textarea class="modal-textarea" id="modalTaskDesc" placeholder="补充详细要求或验收标准（可选）..."></textarea>
       <div class="modal-row">
         <select class="modal-select" id="modalSquadSelect">
-          <option value="dev">🛠️ 指派给：研发小队 (队长 + pi-coder + codex-reviewer)</option>
-          <option value="ops">🔬 指派给：实验与运维小队 (队长 + pi-bench)</option>
+          <option value="dev">🛠️ 指派小队：研发小队 (队长 + pi-coder + codex-reviewer)</option>
+          <option value="ops">🔬 指派小队：实验与运维小队 (队长 + pi-bench)</option>
         </select>
-        <select class="modal-select" id="modalRiskSelect">
-          <option value="low">✅ 验收策略：Reviewer 审查通过自动结单 (Auto-Done)</option>
-          <option value="high">⚠️ 验收策略：高风险需人类最终确认 (in_review)</option>
-        </select>
-        <input class="modal-input" id="modalBindIssue" style="width:140px;height:30px;font-size:11.5px;" placeholder="🔗 绑定 Issue (#12)" />
+        <input class="modal-input" id="modalBindIssue" style="width:150px;height:30px;font-size:11.5px;" placeholder="🔗 绑定 Issue (#12)" />
       </div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
         <button class="pill-btn" onclick="closeCreateIssueModal()">取消</button>
-        <button class="send-btn" onclick="submitModalCreateTask()">🚀 立即创建并在 sota 上启动</button>
+        <button class="send-btn" onclick="submitModalCreateTask()">🚀 创建并派发给 sota</button>
       </div>
     </div>
   </div>
@@ -1018,7 +918,6 @@
         id: "dev",
         name: "研发小队",
         color: "#4f46e5",
-        tag: "1 队长 · 2 组员",
         leaderId: "dev-leader",
         agents: [
           { id: "dev-leader", name: "研发小队队长", role: "队长", isLeader: true, sub: "gemini-4-argon-high", color: "#4f46e5", initials: "队长", dotType: "purple" },
@@ -1030,7 +929,6 @@
         id: "ops",
         name: "实验与运维小队",
         color: "#7c3aed",
-        tag: "1 队长 · 1 组员",
         leaderId: "ops-leader",
         agents: [
           { id: "ops-leader", name: "运维小队队长", role: "队长", isLeader: true, sub: "gemini-4-argon-high", color: "#7c3aed", initials: "队长", dotType: "purple" },
@@ -1039,6 +937,15 @@
       }
     ];
 
+    const AGENT_META = {
+      "dev-leader": { name: "👑 研发小队队长", model: "gemini-4-argon-high", role: "队长拆单/转交" },
+      "pi-coder": { name: "⚡ pi-coder", model: "deepseek-v4.1-flash", role: "编码与单测实现" },
+      "codex-reviewer": { name: "🔍 codex-reviewer", model: "zgca/deepseek-flash", role: "独立审查与准出" },
+      "ops-leader": { name: "👑 运维小队队长", model: "gemini-4-argon-high", role: "队长拆单" },
+      "bench-worker": { name: "⚡ pi-bench", model: "zgca/deepseek-flash", role: "压测执行" }
+    };
+
+    // 每个任务内部按回合 (runs) 组织，绝不把不同任务或不同人的步骤混成一锅粥！
     let tasksData = [
       {
         id: "task_451",
@@ -1053,14 +960,57 @@
         latestVerdict: {
           state: "ready",
           risk: "low",
-          summary: "审查通过 (Auto-Done)：bicycle-riding-pelican.svg 拟人化红色自行车（带笑脸与小黄旗）骑在奔跑的鹈鹕背上；xml.dom.minidom 解析通过（120个元素）且 cairosvg 渲染视觉核验无误。"
+          summary: "审查通过 (Auto-Done)：bicycle-riding-pelican.svg 满足题意（拟人化红色自行车带笑脸骑在奔跑的鹈鹕背上，含车架/双轮/踏板/车把/小旗），xml.dom.minidom 解析通过且 cairosvg 渲染视觉核验无误。"
         },
-        steps: [
-          { badge: "步骤", text: "1. dev-leader (gemini-4-argon-high) 派单 -> @pi-coder" },
-          { badge: "步骤", text: "2. pi-coder (deepseek-v4.1-flash) 编写 bicycle-riding-pelican.svg (9,580B) & XML校验通过" },
-          { badge: "步骤", text: "3. 恢复 dev-leader 原会话 (feef7bda) -> 自动转派给 @codex-reviewer" },
-          { badge: "步骤", text: "4. codex-reviewer (zgca/deepseek-flash) 渲染 PNG 并用 read 肉眼审查构图通过" },
-          { badge: "Report", text: "✅ 自动验收结单 (Auto-Done)：status=done (risk=low)" }
+        runs: [
+          {
+            id: "r451_1",
+            agentId: "dev-leader",
+            status: "completed",
+            stageLabel: "第 1 棒 · 队长拆单",
+            summary: "已将任务 TASK-451 委派给 @pi-coder 绘制 bicycle-riding-pelican.svg（拟人化自行车骑在鹈鹕背上），验证 XML 合法后立即汇报。",
+            steps: [
+              "初始化工作区 /home/qijinyin/multimodal/yangxin/nocturn/worktrees/task-451",
+              "bash: nocturn dispatch --task TASK-451 --to pi-coder --order '创建 bicycle-riding-pelican.svg...'",
+              "派单完成，立即结束队长回合"
+            ]
+          },
+          {
+            id: "r451_2",
+            agentId: "pi-coder",
+            status: "completed",
+            stageLabel: "第 2 棒 · 编码实现",
+            summary: "已创建 bicycle-riding-pelican.svg（9,580 字节，viewBox 0 0 800 620），通过 python3 xml.dom.minidom 解析校验无误并上报 Verdict=ready。",
+            steps: [
+              "write: /home/qijinyin/multimodal/yangxin/nocturn/worktrees/task-451/bicycle-riding-pelican.svg (9,580B)",
+              "bash: python3 -c \"import xml.dom.minidom; xml.dom.minidom.parse('bicycle-riding-pelican.svg')\" -> XML OK",
+              "bash: nocturn report --task TASK-451 --agent pi-coder --state ready --risk low"
+            ]
+          },
+          {
+            id: "r451_3",
+            agentId: "dev-leader",
+            status: "completed",
+            stageLabel: "第 3 棒 · 队长转审",
+            summary: "收到 pi-coder 完工汇报，跨周期恢复队长原会话 (feef7bda)，已将 TASK-451 转交给 @codex-reviewer 进行独立审查。",
+            steps: [
+              "恢复原生会话 --session-id feef7bda-e352-4db4-8c5c-a777958aac49",
+              "bash: nocturn dispatch --task TASK-451 --to codex-reviewer"
+            ]
+          },
+          {
+            id: "r451_4",
+            agentId: "codex-reviewer",
+            status: "completed",
+            stageLabel: "第 4 棒 · 独立审查与自动结单",
+            summary: "审查通过 (Verdict: ready, risk: low) — python xml.dom.minidom 解析通过（120 个元素），使用 cairosvg 渲染 PNG 并通过 read 工具肉眼确认构图正确无缺件。系统已自动结单 (Auto-Done)。",
+            steps: [
+              "read: /home/qijinyin/multimodal/yangxin/nocturn/worktrees/task-451/bicycle-riding-pelican.svg",
+              "bash: cairosvg.svg2png -> /home/qijinyin/multimodal/yangxin/nocturn/tmp/t451-review.png",
+              "read: 视觉检查 t451-review.png 确认自行车骑在鹈鹕背上",
+              "bash: nocturn report --task TASK-451 --agent codex-reviewer --state ready --risk low"
+            ]
+          }
         ]
       },
       {
@@ -1075,14 +1025,49 @@
         latestVerdict: {
           state: "ready",
           risk: "low",
-          summary: "独立审查通过 (Auto-Done)：array-stats.js 采用 Neumaier 补偿求和与非破坏性排序中位数；独立复跑 12/12 单测与 200 万元素边界抽查全部通过，低风险自动结单。"
+          summary: "独立审查通过 (Auto-Done)：array-stats.js 采用 Neumaier 补偿求和与非破坏性排序中位数；独立复跑 12/12 单测与 200 万元素边界抽查全部通过。"
         },
-        steps: [
-          { badge: "步骤", text: "1. [+8s] dev-leader (gemini-4-argon-high) 派单 -> @pi-coder" },
-          { badge: "步骤", text: "2. [+28s] pi-coder (deepseek-v4.1-flash) 写完 array-stats.js & 12项单测通过 -> report ready" },
-          { badge: "步骤", text: "3. [+36s] 恢复 dev-leader 原会话 (3be16ae6) -> 自动转派给 @codex-reviewer" },
-          { badge: "步骤", text: "4. [+54s] codex-reviewer (zgca/deepseek-flash) 复跑12项单测+边界抽查 -> report ready (risk=low)" },
-          { badge: "Report", text: "✅ 自动验收结单 (Auto-Done)：status=done，全程 54 秒零人工点击" }
+        runs: [
+          {
+            id: "r450_1",
+            agentId: "dev-leader",
+            status: "completed",
+            stageLabel: "第 1 棒 · 队长拆单",
+            summary: "已委派 @pi-coder 实现 array-stats.js (mean/median) 及单元测试 array-stats.test.js。",
+            steps: ["bash: nocturn dispatch --task TASK-450 --to pi-coder"]
+          },
+          {
+            id: "r450_2",
+            agentId: "pi-coder",
+            status: "completed",
+            stageLabel: "第 2 棒 · 编码实现",
+            summary: "已编写 array-stats.js 与 array-stats.test.js（12 项用例全部通过，采用 Neumaier 补偿求和保证大数精度）。",
+            steps: [
+              "write: array-stats.js (3,473B) & array-stats.test.js (2,890B)",
+              "bash: node array-stats.test.js -> 12 pass / 0 fail",
+              "bash: nocturn report --task TASK-450 --agent pi-coder --state ready --risk low"
+            ]
+          },
+          {
+            id: "r450_3",
+            agentId: "dev-leader",
+            status: "completed",
+            stageLabel: "第 3 棒 · 队长转审",
+            summary: "恢复队长原会话 (3be16ae6)，自动转交 @codex-reviewer 独立审查。",
+            steps: ["bash: nocturn dispatch --task TASK-450 --to codex-reviewer"]
+          },
+          {
+            id: "r450_4",
+            agentId: "codex-reviewer",
+            status: "completed",
+            stageLabel: "第 4 棒 · 独立审查与自动结单",
+            summary: "独立复跑 node array-stats.test.js (12/12 通过)，并额外抽查 [1e16,1,-1e16,2] 精度、200万长数组、稀疏数组与 8 类非法入参抛错，全部符合契约，低风险自动结单 (Auto-Done)。",
+            steps: [
+              "bash: node array-stats.test.js -> 12 pass / 0 fail",
+              "bash: 边界抽查脚本 (MAX_SAFE_INTEGER / 2e6 长数组 / 稀疏数组) 全部通过",
+              "bash: nocturn report --task TASK-450 --agent codex-reviewer --state ready --risk low"
+            ]
+          }
         ]
       },
       {
@@ -1097,14 +1082,33 @@
         latestVerdict: {
           state: "ready",
           risk: "low",
-          summary: "VERDICT: APPROVE（低风险常规任务，Reviewer 独立复跑 13/13 单测通过，系统已自动验收结单 Auto-Done）。"
+          summary: "VERDICT: APPROVE — 独立复跑 13/13 单测通过，Emoji 代理对与 NFKC 归一化边界抽查全部通过。"
         },
-        steps: [
-          { badge: "步骤", text: "1. dev-leader (gemini-4-argon-high) 派单 -> @pi-coder" },
-          { badge: "步骤", text: "2. pi-coder (deepseek-v4.1-flash) 编写 string-utils.js & 13项单测通过 -> report ready" },
-          { badge: "步骤", text: "3. 自动恢复 dev-leader 原会话 (8a01972b) -> 转派给 @codex-reviewer" },
-          { badge: "步骤", text: "4. codex-reviewer (zgca/deepseek-flash) 独立复跑 13 项单测与边界抽查" },
-          { badge: "Report", text: "Verdict=ready · VERDICT: APPROVE (13/13 pass)" }
+        runs: [
+          {
+            id: "r448_1",
+            agentId: "dev-leader",
+            status: "completed",
+            stageLabel: "第 1 棒 · 队长拆单",
+            summary: "已委派 @pi-coder 实现 string-utils.js 与单元测试。",
+            steps: ["bash: nocturn dispatch --task TASK-448 --to pi-coder"]
+          },
+          {
+            id: "r448_2",
+            agentId: "pi-coder",
+            status: "completed",
+            stageLabel: "第 2 棒 · 编码实现",
+            summary: "已完成 string-utils.js 与 string-utils.test.js，13 项单测全部通过。",
+            steps: ["write: string-utils.js & string-utils.test.js", "bash: node string-utils.test.js -> 13 pass"]
+          },
+          {
+            id: "r448_4",
+            agentId: "codex-reviewer",
+            status: "completed",
+            stageLabel: "第 4 棒 · 独立审查",
+            summary: "VERDICT: APPROVE — 13/13 单测通过，Emoji 代理对抽查通过。",
+            steps: ["bash: node string-utils.test.js -> 13 pass", "bash: nocturn report --state ready"]
+          }
         ]
       },
       {
@@ -1119,36 +1123,36 @@
         svgUrl: "/api/pelican.svg",
         latestVerdict: {
           state: "ready",
+          risk: "high",
           summary: "已在 sota:/home/qijinyin/multimodal/yangxin/nocturn/worktrees/task-445-pi-coder/pelican-bicycle.svg 完成绘制并通过渲染验证（18.8 KB）。"
         },
-        steps: [
-          { badge: "步骤", text: "dev-leader (gemini-4-argon-high) 派单 -> pi-coder (deepseek-v4.1-flash)" },
-          { badge: "步骤", text: "write: /home/qijinyin/multimodal/yangxin/nocturn/worktrees/task-445-pi-coder/pelican-bicycle.svg (18,853B)" },
-          { badge: "步骤", text: "bash: xmllint --noout pelican-bicycle.svg && cairosvg 渲染验证通过" },
-          { badge: "Report", text: "Verdict=ready · 已完成鹈鹕骑自行车 SVG 绘制与验证" }
+        runs: [
+          {
+            id: "r445_1",
+            agentId: "dev-leader",
+            status: "completed",
+            stageLabel: "第 1 棒 · 队长拆单",
+            summary: "已委派 @pi-coder 绘制 pelican-bicycle.svg。",
+            steps: ["bash: nocturn dispatch --task TASK-445 --to pi-coder"]
+          },
+          {
+            id: "r445_2",
+            agentId: "pi-coder",
+            status: "completed",
+            stageLabel: "第 2 棒 · 绘制与验证",
+            summary: "已完成 pelican-bicycle.svg (18,853B) 绘制并通过 xmllint 与 cairosvg 验证。",
+            steps: ["write: pelican-bicycle.svg (18,853B)", "bash: xmllint --noout pelican-bicycle.svg"]
+          }
         ]
       }
     ];
 
-    let centerTab = "now"; // 'now' | 'issues' | 'detail'
-    let issueFilter = "all";
+    let sidebarFilter = "all"; // 'all' | 'active' | 'inbox' | 'done' | 'squad:dev' | 'agent:pi-coder' ...
+    let surfaceMode = "list";  // 'list' | 'board' | 'now'
     let selectedTaskId = "task_451";
-    let selectedActorId = null;
-    let selectedSquadId = null;
-    let hoveredActorId = null;
-    let hoveredPillId = null;
-    let stepsExpanded = true;
-    let cachedWorktreeFiles = {}; // taskCode -> { worktreePath, files: [{name, content}] }
-    let selectedFileIdx = 0;
-
-    const leftCol = document.getElementById("leftColumn");
-    const rightCol = document.getElementById("rightColumn");
-    const svgEl = document.getElementById("curvesSvg");
-    const stageEl = document.getElementById("bipartiteStage");
-    const peekModeBadge = document.getElementById("peekModeBadge");
-    const peekPropsBar = document.getElementById("peekPropsBar");
-    const peekScrollEl = document.getElementById("peekScroll");
-    const composerInput = document.getElementById("composerInput");
+    let expandedRunIds = {};   // runId -> boolean (默认收起已完成的步骤，保持界面清爽！)
+    let cachedWorktreeFiles = {}; // taskCode -> { worktreePath, files: [{name, size, content}] }
+    let activeFileByTask = {};    // taskCode -> number | null (null 表示收起代码框)
 
     function compactSingleLine(raw) {
       const oneLine = String(raw || "")
@@ -1156,145 +1160,297 @@
         .replace(/^\[sota 工具调用 · ([^\]]+)\]\s*/, "$1: ")
         .replace(/^\[sota Pi 1\.5\.0 回复\]\s*/, "回复: ")
         .trim();
-      return oneLine.length > 78 ? oneLine.slice(0, 78) + "…" : oneLine;
+      return oneLine.length > 88 ? oneLine.slice(0, 88) + "…" : oneLine;
     }
 
-    function switchCenterTab(tab) {
-      centerTab = tab;
-      const isDetail = tab === "detail";
-      document.getElementById("centerStagePane").style.display = isDetail ? "none" : "flex";
-      document.getElementById("issuePeekPanel").style.display = isDetail ? "none" : "flex";
-      document.getElementById("fullIssueDetailView").style.display = isDetail ? "grid" : "none";
-
-      if (!isDetail) {
-        document.getElementById("centerViewNow").style.display = tab === "now" ? "flex" : "none";
-        document.getElementById("centerViewIssues").style.display = tab === "issues" ? "flex" : "none";
+    function setSidebarFilter(filter) {
+      sidebarFilter = filter;
+      const titles = {
+        all: "📋 全部任务 (Issues)",
+        active: "🟢 进行中任务 (In Progress)",
+        inbox: "📥 待我审核 (Inbox)",
+        done: "✅ 已自动结单 (Done)",
+        "squad:dev": "🛠️ 研发小队 · 负责的任务",
+        "squad:ops": "🔬 实验与运维小队 · 负责的任务"
+      };
+      if (filter.startsWith("agent:")) {
+        const aid = filter.split(":")[1];
+        titles[filter] = `🤖 @${aid} · 参与的任务`;
       }
-      document.getElementById("navBtnNow").classList.toggle("active", tab === "now");
-      document.getElementById("navBtnIssues").classList.toggle("active", tab === "issues" || tab === "detail");
-      document.getElementById("railNowBtn").classList.toggle("active", tab === "now");
-      document.getElementById("railIssuesBtn").classList.toggle("active", tab === "issues" || tab === "detail");
+      document.getElementById("surfaceHeaderTitle").textContent = titles[filter] || "📋 任务列表";
       syncUI();
     }
 
-    // 打开借鉴 Multica `issue-detail.tsx` 的双栏全屏任务详情页，并从 sota 实时拉取该任务的工作区源码文件！
-    function openFullIssueDetail(taskId) {
-      selectedTaskId = taskId;
-      selectedFileIdx = 0;
-      const t = tasksData.find(x => x.id === taskId) || tasksData[0];
-      if (t) {
-        fetch(`${API_BASE}/api/worktree-files?task=${encodeURIComponent(t.identifier)}`)
-          .then(r => r.ok ? r.json() : null)
-          .then(data => {
-            if (data && Array.isArray(data.files)) {
-              cachedWorktreeFiles[t.identifier] = data;
-              if (centerTab === "detail") renderFullIssueDetailView();
-            }
-          })
-          .catch(() => {});
-      }
-      switchCenterTab("detail");
+    function setSurfaceMode(mode) {
+      surfaceMode = mode;
+      document.getElementById("modeBtnList").classList.toggle("active", mode === "list");
+      document.getElementById("modeBtnBoard").classList.toggle("active", mode === "board");
+      document.getElementById("modeBtnNow").classList.toggle("active", mode === "now");
+      document.getElementById("viewContainerList").style.display = mode === "list" ? "flex" : "none";
+      document.getElementById("viewContainerBoard").style.display = mode === "board" ? "grid" : "none";
+      document.getElementById("viewContainerNow").style.display = mode === "now" ? "flex" : "none";
+      syncUI();
     }
 
-    function openCreateIssueModal() {
-      document.getElementById("createIssueModal").classList.add("open");
-      document.getElementById("modalTaskTitle").focus();
-    }
-    function closeCreateIssueModal() {
-      document.getElementById("createIssueModal").classList.remove("open");
-    }
-
-    function submitModalCreateTask() {
-      const titleEl = document.getElementById("modalTaskTitle");
-      const descEl = document.getElementById("modalTaskDesc");
-      const squadId = document.getElementById("modalSquadSelect").value;
-      const bindIssue = document.getElementById("modalBindIssue").value.trim();
-      const titleVal = titleEl.value.trim();
-      if (!titleVal) { titleEl.focus(); return; }
-
-      document.getElementById("quickTaskInput").value = titleVal + (descEl.value.trim() ? `（${descEl.value.trim()}）` : "");
-      document.getElementById("quickIssueBindInput").value = bindIssue;
-      titleEl.value = "";
-      descEl.value = "";
-      closeCreateIssueModal();
-      submitLiveTaskFromBar(squadId);
-    }
-
-    function setIssueFilter(f) {
-      issueFilter = f;
-      document.querySelectorAll(".filter-tab").forEach(el => {
-        el.classList.toggle("active", el.dataset.filter === f);
-      });
-      renderIssuesBoard();
-    }
-
-    function selectSquadLeader(squadId) {
-      selectedSquadId = squadId;
-      selectedActorId = squads.find(s => s.id === squadId)?.leaderId || "dev-leader";
-      const firstSquadTask = tasksData.find(t => t.squadId === squadId);
-      if (firstSquadTask) selectedTaskId = firstSquadTask.id;
-      if (centerTab === "detail") switchCenterTab("now");
-      else syncUI();
-    }
-
-    function selectWorker(workerId) {
-      selectedActorId = workerId;
-      selectedSquadId = null;
-      const workerTask = tasksData.find(t => t.assignedWorkerId === workerId || t.leaderAgentId === workerId);
-      if (workerTask) selectedTaskId = workerTask.id;
-      if (centerTab === "detail") switchCenterTab("now");
-      else syncUI();
+    function toggleDrawerExpand() {
+      const drawer = document.getElementById("taskDetailDrawer");
+      const btn = document.getElementById("expandDrawerBtn");
+      const expanded = drawer.classList.toggle("expanded-full");
+      btn.textContent = expanded ? "⤡ 恢复标准宽度" : "⤢ 宽屏展开";
+      setTimeout(() => requestAnimationFrame(drawCurves), 180);
     }
 
     function selectTask(taskId) {
       selectedTaskId = taskId;
-      selectedActorId = null;
-      selectedSquadId = null;
-      syncUI();
-    }
-
-    function focusAllNow() {
-      selectedActorId = null;
-      selectedSquadId = null;
-      syncUI();
-    }
-
-    function promptBindIssue(taskId, ev) {
-      if (ev) ev.stopPropagation();
       const t = tasksData.find(x => x.id === taskId);
-      if (!t) return;
-      const val = prompt(
-        `为任务 ${t.identifier} 绑定外部或仓库 Issue（如 poijygfdyy/nocturn#12）：`,
-        t.boundIssue || `nocturn#${t.identifier.replace("TASK-", "")}`
-      );
-      if (val === null) return;
-      t.boundIssue = val.trim();
-      fetch(`${API_BASE}/api/tasks/bind-issue`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: t.identifier, issueRef: t.boundIssue })
-      }).catch(() => {});
-      syncUI();
-    }
-
-    function deleteTask(taskId, identifier, ev) {
-      if (ev) ev.stopPropagation();
-      tasksData = tasksData.filter(t => t.id !== taskId && t.identifier !== identifier);
-      if (selectedTaskId === taskId && tasksData[0]) {
-        selectedTaskId = tasksData[0].id;
+      if (t && !cachedWorktreeFiles[t.identifier]) {
+        fetchWorktreeFiles(t.identifier);
       }
-      fetch(`${API_BASE}/api/tasks/${encodeURIComponent(identifier)}`, { method: "DELETE" }).catch(() => {});
       syncUI();
     }
 
-    function renderSidebarAgents() {
+    function fetchWorktreeFiles(taskCode) {
+      fetch(`${API_BASE}/api/worktree-files?task=${encodeURIComponent(taskCode)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && Array.isArray(data.files)) {
+            cachedWorktreeFiles[taskCode] = data;
+            renderTaskDetailDrawer();
+          }
+        })
+        .catch(() => {});
+    }
+
+    function getFilteredTasks() {
+      return tasksData.filter(t => {
+        if (sidebarFilter === "active") return t.status === "dispatching" || t.status === "in_progress";
+        if (sidebarFilter === "inbox") return t.status === "in_review";
+        if (sidebarFilter === "done") return t.status === "done";
+        if (sidebarFilter.startsWith("squad:")) return t.squadId === sidebarFilter.split(":")[1];
+        if (sidebarFilter.startsWith("agent:")) {
+          const aid = sidebarFilter.split(":")[1];
+          return t.assignedWorkerId === aid || t.leaderAgentId === aid || (t.runs || []).some(r => r.agentId === aid);
+        }
+        return true;
+      });
+    }
+
+    // 1. 渲染 Multica 默认分组列表视图 (按状态分为：🟢 进行中 / ⚠️ 待我审核 / ✅ 已自动结单)
+    function renderGroupedListView(tasks) {
+      const container = document.getElementById("viewContainerList");
+      const groups = [
+        { key: "active", label: "🟢 进行中 (In Progress)", items: tasks.filter(t => t.status === "dispatching" || t.status === "in_progress") },
+        { key: "review", label: "⚠️ 待我审核 (In Review)", items: tasks.filter(t => t.status === "in_review") },
+        { key: "done", label: "✅ 已完成 / 自动结单 (Done)", items: tasks.filter(t => t.status === "done") }
+      ].filter(g => g.items.length > 0);
+
+      if (groups.length === 0) {
+        container.innerHTML = `<div style="padding:32px;text-align:center;color:#94a3b8;font-size:12.5px;background:#fff;border-radius:12px;border:1px solid #e5e7eb;">当前筛选下暂无任务</div>`;
+        return;
+      }
+
+      container.innerHTML = groups.map(g => `
+        <div class="status-group-section">
+          <div class="status-group-header">
+            <span>${g.label}</span>
+            <span style="color:#64748b;">${g.items.length} 项</span>
+          </div>
+          ${g.items.map(t => {
+            const owner = t.assignedWorkerId || t.leaderAgentId;
+            const runCount = (t.runs || []).length;
+            const badgeClass = t.status === "done" || t.status === "in_review" ? "ready" : "progress";
+            const badgeText = t.status === "done" ? "✅ 已自动结单" : (t.status === "in_review" ? "⚠️ 待你拍板" : `🟢 ${owner} 执行中`);
+            return `
+              <div class="issue-row ${t.id === selectedTaskId ? 'selected' : ''}" onclick="selectTask('${t.id}')">
+                <div class="issue-row-left">
+                  <span class="issue-code">${t.identifier}</span>
+                  <span class="issue-row-title">${t.title}</span>
+                  <span class="issue-row-summary">${t.latestVerdict?.summary || ''}</span>
+                </div>
+                <div class="issue-row-right">
+                  <span class="issue-bind-chip" onclick="promptBindIssue('${t.id}', event)">🔗 ${t.boundIssue || t.identifier}</span>
+                  <span style="font-size:10.5px;color:#64748b;font-weight:600;">${runCount} 棒接力 · @${owner}</span>
+                  <span class="verdict-mini-badge ${badgeClass}">${badgeText}</span>
+                  <button class="del-btn" title="删除任务" onclick="deleteTask('${t.id}', '${t.identifier}', event)">✕</button>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `).join("");
+    }
+
+    // 2. 渲染 Multica 三列状态看板视图 (Board)
+    function renderBoardView(tasks) {
+      const container = document.getElementById("viewContainerBoard");
+      const cols = [
+        { title: "🟢 进行中 (In Progress)", items: tasks.filter(t => t.status === "dispatching" || t.status === "in_progress") },
+        { title: "⚠️ 待我审核 (In Review)", items: tasks.filter(t => t.status === "in_review") },
+        { title: "✅ 已自动结单 (Done)", items: tasks.filter(t => t.status === "done") }
+      ];
+
+      container.innerHTML = cols.map(c => `
+        <div class="board-col">
+          <div class="board-col-header">
+            <span>${c.title}</span>
+            <span>${c.items.length}</span>
+          </div>
+          ${c.items.map(t => `
+            <div class="board-card ${t.id === selectedTaskId ? 'selected' : ''}" onclick="selectTask('${t.id}')">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span class="issue-code">${t.identifier}</span>
+                <span class="issue-bind-chip" onclick="promptBindIssue('${t.id}', event)">🔗 ${t.boundIssue || t.identifier}</span>
+              </div>
+              <div style="font-size:12.5px;font-weight:700;color:#111827;line-height:1.35;">${t.title}</div>
+              <div style="font-size:11px;color:#64748b;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+                ${t.latestVerdict?.summary || '正在 sota 执行中...'}
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:2px;font-size:10.5px;color:#475569;font-weight:600;">
+                <span>@${t.assignedWorkerId || t.leaderAgentId}</span>
+                <span>${(t.runs || []).length} 个运行回合 ›</span>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `).join("");
+    }
+
+    // 3. 渲染右侧按任务组织的详情抽屉（Multica `IssueDetail`：上面看产物文件，下面按第 1..4 棒回合卡片看进度，步骤默认折叠！）
+    function renderTaskDetailDrawer() {
+      const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
+      if (!t) return;
+
+      const owner = t.assignedWorkerId || t.leaderAgentId || "pi-coder";
+      document.getElementById("drawerTaskCode").textContent = t.identifier;
+      const fileData = cachedWorktreeFiles[t.identifier];
+      const worktreeDir = fileData?.worktreePath || `/home/qijinyin/multimodal/yangxin/nocturn/worktrees/${t.identifier.toLowerCase()}`;
+      document.getElementById("drawerWorktreeLabel").textContent = worktreeDir;
+      document.getElementById("triggerChipLabel").textContent = `⚡ 对 ${t.identifier} (@${owner}) 插话`;
+
+      const statusLabel = t.status === "done" ? "✅ 已自动结单 (Done)" : (t.status === "in_review" ? "⚠️ 待我审核 (In Review)" : "🟢 进行中 (In Progress)");
+      const dotClass = t.status === "in_review" || t.status === "done" ? "in_review" : "running";
+
+      document.getElementById("drawerPropsBar").innerHTML = `
+        <div class="prop-pill" onclick="cycleTaskStatus('${t.id}')" title="点击切换状态">
+          <span class="task-dot ${dotClass}"></span>
+          <span>${statusLabel} ▾</span>
+        </div>
+        <div class="prop-pill" style="border-color:#c7d2fe;background:#eef2ff;color:#4338ca;" onclick="promptBindIssue('${t.id}', event)">
+          <span>🔗 ${t.boundIssue || t.identifier}</span>
+        </div>
+        <div class="prop-pill" onclick="triggerTargetedRework('${t.id}')">↩️ 驳回返工</div>
+        <div class="prop-pill" style="margin-left:auto;color:#dc2626;" onclick="deleteTask('${t.id}', '${t.identifier}', event)">删除</div>
+      `;
+
+      // A. 交付物与真实 sota 工作区文件区 (`DeliverablesSection`)
+      const svgUrl = t.svgUrl || (t.identifier === "TASK-451" ? "/api/bicycle-pelican.svg" : (t.identifier === "TASK-445" ? "/api/pelican.svg" : null));
+      const svgPreviewHtml = svgUrl ? `
+        <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#ffffff;">
+          <img src="${API_BASE}${svgUrl}" style="width:100%;max-height:190px;object-fit:contain;display:block;" alt="SVG Preview"/>
+        </div>
+      ` : "";
+
+      const files = fileData?.files || [];
+      const activeIdx = activeFileByTask[t.identifier];
+      const filePillsHtml = files.length > 0
+        ? files.map((f, idx) => `
+            <span class="file-pill ${activeIdx === idx ? 'active' : ''}" onclick="toggleWorktreeFile('${t.identifier}', ${idx})">
+              📄 ${f.name} (${f.size}B)
+            </span>
+          `).join("")
+        : `<span style="font-size:11px;color:#64748b;cursor:pointer;" onclick="fetchWorktreeFiles('${t.identifier}')">📂 点击读取 sota 工作区源码文件</span>`;
+
+      const selectedFileObj = (activeIdx !== undefined && activeIdx !== null) ? files[activeIdx] : null;
+      const codeBoxHtml = selectedFileObj
+        ? `<div class="code-viewer-box">${selectedFileObj.content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
+        : "";
+
+      // B. 按回合分组的 `CommentCard` + `InlineCommentRun` 接力时间线（每个 Run 一张干净卡片，工具步骤默认折叠！）
+      const runs = t.runs || [];
+      const turnsHtml = runs.map((r, idx) => {
+        const meta = AGENT_META[r.agentId] || { name: r.agentId, model: "deepseek-flash", role: "执行回合" };
+        const isRunning = r.status === "running";
+        const isExpanded = expandedRunIds[r.id] !== undefined ? expandedRunIds[r.id] : isRunning;
+        const stepList = (r.steps || []).map(st => typeof st === "string" ? st : st.text)
+          .filter(txt => !String(txt).startsWith("[sota Pi 1.5.0 回复] I'll start by inspecting"));
+
+        const stepsBlock = isExpanded ? `
+          <div class="inline-run-steps-list">
+            ${stepList.map(line => `<div>• ${compactSingleLine(line)}</div>`).join("") || '<div>正在启动...</div>'}
+          </div>
+        ` : "";
+
+        return `
+          <div class="turn-comment-card">
+            <div class="turn-comment-header">
+              <span class="turn-author">${meta.name}</span>
+              <span class="turn-model-tag">${meta.model}</span>
+              <span class="turn-stage-badge">${r.stageLabel || `第 ${idx + 1} 棒 · ${meta.role}`}</span>
+            </div>
+            <div class="turn-comment-body">${r.summary || '正在执行当前回合...'}</div>
+            <div class="inline-run-bar">
+              <div class="inline-run-summary-row" onclick="expandedRunIds['${r.id}'] = !${isExpanded}; renderTaskDetailDrawer();">
+                <span>${isRunning ? '🟢 正在 sota 上运行...' : `✅ 回合已完成 · 共 ${stepList.length} 步工具调用`}</span>
+                <span style="color:#4f46e5;">${isExpanded ? '收起步骤 ▲' : '展开步骤明细 ▼'}</span>
+              </div>
+              ${stepsBlock}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      document.getElementById("drawerScroll").innerHTML = `
+        <h2 class="drawer-task-title">${t.title}</h2>
+
+        <!-- 交付产物与工作区真实源码区 (DeliverablesSection) -->
+        <div class="deliverables-card">
+          <div class="deliverables-header">
+            <span>📦 任务交付产物与 sota 工作区文件 (点击文件名查看源码)</span>
+            <span style="color:#4f46e5;cursor:pointer;font-weight:600;" onclick="fetchWorktreeFiles('${t.identifier}')">↻ 刷新文件</span>
+          </div>
+          ${svgPreviewHtml}
+          <div class="file-pills-row">${filePillsHtml}</div>
+          ${codeBoxHtml}
+        </div>
+
+        <div style="font-size:11px;font-weight:700;color:#8f959e;padding-top:4px;display:flex;justify-content:space-between;">
+          <span>⏱️ 本任务的多智能体接力时间线 (${runs.length} 个回合)</span>
+          <span>每个回合独立成卡 · 点击可展开工具明细</span>
+        </div>
+
+        ${turnsHtml}
+      `;
+    }
+
+    function toggleWorktreeFile(taskCode, idx) {
+      if (activeFileByTask[taskCode] === idx) {
+        activeFileByTask[taskCode] = null;
+      } else {
+        activeFileByTask[taskCode] = idx;
+      }
+      renderTaskDetailDrawer();
+    }
+
+    function renderSidebar() {
+      document.getElementById("countAllIssues").textContent = String(tasksData.length);
+      document.getElementById("countActiveIssues").textContent = String(tasksData.filter(t => t.status === "dispatching" || t.status === "in_progress").length);
+      document.getElementById("countInboxIssues").textContent = String(tasksData.filter(t => t.status === "in_review").length);
+      document.getElementById("countDoneIssues").textContent = String(tasksData.filter(t => t.status === "done").length);
+
+      document.getElementById("navAllIssues").classList.toggle("active", sidebarFilter === "all");
+      document.getElementById("navActiveIssues").classList.toggle("active", sidebarFilter === "active");
+      document.getElementById("navInboxIssues").classList.toggle("active", sidebarFilter === "inbox");
+      document.getElementById("navDoneIssues").classList.toggle("active", sidebarFilter === "done");
+      document.getElementById("navSquad_dev").classList.toggle("active", sidebarFilter === "squad:dev");
+      document.getElementById("navSquad_ops").classList.toggle("active", sidebarFilter === "squad:ops");
+
       const container = document.getElementById("sidebarAgentsList");
       let html = "";
       squads.forEach(s => {
         s.agents.forEach(a => {
-          const isAct = selectedActorId === a.id;
+          const isAct = sidebarFilter === `agent:${a.id}`;
           html += `
-            <div class="nav-row ${isAct ? 'active' : ''}" onclick="selectWorker('${a.id}')">
+            <div class="nav-row ${isAct ? 'active' : ''}" onclick="setSidebarFilter('agent:${a.id}')">
               <div class="member-avatar-wrap">
                 <div class="member-avatar" style="background:${a.color}">${a.initials}</div>
                 <span class="online-dot"></span>
@@ -1310,253 +1466,128 @@
       container.innerHTML = html;
     }
 
-    function renderIssuesBoard() {
-      const container = document.getElementById("issuesListContainer");
-      const filtered = tasksData.filter(t => {
-        if (issueFilter === "active") return t.status === "dispatching" || t.status === "in_progress";
-        if (issueFilter === "in_review") return t.status === "in_review";
-        if (issueFilter === "done") return t.status === "done";
-        return true;
+    function renderNowGraph(tasks) {
+      const leftCol = document.getElementById("leftColumn");
+      const rightCol = document.getElementById("rightColumn");
+      leftCol.innerHTML = "";
+      squads.forEach(s => {
+        const pod = document.createElement("div");
+        pod.className = "squad-pod";
+        pod.innerHTML = `
+          <div class="squad-pod-header" onclick="setSidebarFilter('squad:${s.id}')">
+            <span class="squad-pod-name"><span class="squad-pod-dot" style="background:${s.color}"></span>${s.name}</span>
+            <span class="squad-pod-tag">${s.agents.length}人</span>
+          </div>
+        `;
+        s.agents.forEach(a => {
+          const node = document.createElement("div");
+          node.className = "actor-node" + (a.isLeader ? "" : " worker-indent");
+          node.dataset.actorId = a.id;
+          node.innerHTML = `
+            <div class="actor-left">
+              <div class="actor-avatar" style="background:${a.color}">${a.initials}</div>
+              <div>
+                <div class="actor-name">${a.name}</div>
+                <div class="actor-sub">${a.sub}</div>
+              </div>
+            </div>
+            <span class="origin-dot ${a.dotType === 'blue' ? 'blue' : ''}"></span>
+          `;
+          node.addEventListener("click", () => setSidebarFilter(`agent:${a.id}`));
+          pod.appendChild(node);
+        });
+        leftCol.appendChild(pod);
       });
 
-      if (filtered.length === 0) {
-        container.innerHTML = `<div style="padding:28px;text-align:center;color:#94a3b8;font-size:12px;">当前分类下暂无任务，可点击左上角「＋ 新建任务」</div>`;
-        return;
-      }
-
-      container.innerHTML = filtered.map(t => {
-        const statusText = t.status === "done" ? "✅ 已自动结单" : (t.status === "in_review" ? "⚠️ 待你拍板" : (t.status === "dispatching" ? "队长派单中" : "执行中"));
-        const badgeClass = t.status === "in_review" || t.status === "done" ? "ready" : (t.status === "dispatching" ? "dispatch" : "progress");
-        const owner = t.assignedWorkerId || t.leaderAgentId;
-        const summary = t.latestVerdict?.summary || "正在 sota 上执行中...";
-        return `
-          <div class="issue-row" onclick="openFullIssueDetail('${t.id}')">
-            <div class="issue-row-left">
-              <span class="issue-code">${t.identifier}</span>
-              <span class="issue-row-title">${t.title}</span>
-              <span class="issue-row-summary">${summary}</span>
-            </div>
-            <div class="issue-row-right">
-              <span class="issue-bind-chip" onclick="promptBindIssue('${t.id}', event)">🔗 ${t.boundIssue || t.identifier}</span>
-              <span style="font-size:11px;color:#475569;font-weight:600;">@${owner}</span>
-              <span class="verdict-mini-badge ${badgeClass}">${statusText}</span>
-              <button class="del-btn" title="删除此任务" onclick="deleteTask('${t.id}', '${t.identifier}', event)">✕</button>
-            </div>
+      rightCol.innerHTML = "";
+      tasks.forEach(t => {
+        const el = document.createElement("div");
+        el.className = "task-pill" + (t.id === selectedTaskId ? " selected-pill" : "");
+        el.dataset.pillId = t.id;
+        const dotClass = t.status === "in_review" || t.status === "done" ? "in_review" : "running";
+        const badgeClass = t.status === "in_review" || t.status === "done" ? "ready" : "progress";
+        const badgeText = t.status === "done" ? "✅ 已结单" : (t.status === "in_review" ? "⚠️ 待审核" : "执行中");
+        el.innerHTML = `
+          <div class="task-pill-left">
+            <span class="task-dot ${dotClass}"></span>
+            <span class="task-title">${t.title}</span>
           </div>
+          <span class="issue-bind-chip" onclick="promptBindIssue('${t.id}', event)">🔗 ${t.boundIssue || t.identifier}</span>
+          <span class="verdict-mini-badge ${badgeClass}">${badgeText}</span>
         `;
-      }).join("");
+        el.addEventListener("click", () => selectTask(t.id));
+        rightCol.appendChild(el);
+      });
+      requestAnimationFrame(drawCurves);
     }
 
-    // 渲染 Multica 风格的双栏完整任务详情工作台 (`fullIssueDetailView`)
-    function renderFullIssueDetailView() {
-      const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
-      if (!t) return;
-      document.getElementById("detailTaskCode").textContent = t.identifier;
+    function drawCurves() {
+      if (surfaceMode !== "now") return;
+      const stageEl = document.getElementById("bipartiteStage");
+      const svgEl = document.getElementById("curvesSvg");
+      const leftCol = document.getElementById("leftColumn");
+      const rightCol = document.getElementById("rightColumn");
+      const stageRect = stageEl.getBoundingClientRect();
+      if (stageRect.width === 0) return;
 
-      const isDone = t.status === "done" || t.status === "in_review";
-      const isCoderDone = isDone || t.assignedWorkerId === "codex-reviewer";
-      const isLeaderDispatched = Boolean(t.assignedWorkerId);
+      const actorAnchors = {};
+      const pillAnchors = {};
+      leftCol.querySelectorAll(".actor-node").forEach(node => {
+        const dotEl = node.querySelector(".origin-dot");
+        const r = dotEl.getBoundingClientRect();
+        actorAnchors[node.dataset.actorId] = { x: r.left - stageRect.left + r.width / 2, y: r.top - stageRect.top + r.height / 2 };
+      });
+      rightCol.querySelectorAll(".task-pill").forEach(el => {
+        const r = el.getBoundingClientRect();
+        pillAnchors[el.dataset.pillId] = { x: r.left - stageRect.left, y: r.top - stageRect.top + r.height / 2 };
+      });
 
-      const svgUrl = t.svgUrl || (t.identifier === "TASK-451" ? "/api/bicycle-pelican.svg" : (t.identifier === "TASK-445" ? "/api/pelican.svg" : null));
-      const svgBanner = svgUrl ? `
-        <div style="border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#f8fafc;display:flex;flex-direction:column;gap:6px;">
-          <div style="font-size:11.5px;font-weight:700;color:#334155;">🎨 sota 生成的 SVG 视觉产物预览</div>
-          <img src="${API_BASE}${svgUrl}" style="width:100%;max-height:280px;object-fit:contain;border-radius:8px;background:#fff;" alt="SVG Preview"/>
-        </div>
-      ` : "";
+      svgEl.setAttribute("viewBox", `0 0 ${stageRect.width} ${stageRect.height}`);
+      svgEl.innerHTML = "";
 
-      const rawSteps = (t.steps || []).filter(s => !String(s.text).startsWith("[sota Pi 1.5.0 回复] I'll start by inspecting"));
-      const stepsLines = rawSteps.map(s => `<div>• [${s.badge}] ${compactSingleLine(s.text)}</div>`).join("");
-
-      document.getElementById("detailMainScroll").innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-          <h2 class="detail-title">${t.title}</h2>
-          <span class="verdict-mini-badge ${isDone ? 'ready' : 'progress'}" style="font-size:12px;padding:4px 10px;">
-            ${t.status === 'done' ? '✅ 已自动结单 (Auto-Done)' : (t.status === 'in_review' ? '⚠️ 待人类审核' : '🟢 sota 正在执行中')}
-          </span>
-        </div>
-
-        <!-- 四棒接力实时进度条 -->
-        <div class="relay-stepper">
-          <div class="relay-step-item ${isLeaderDispatched ? 'done' : 'running'}">
-            <span class="relay-step-title">① 队长拆单 (dev-leader)</span>
-            <span class="relay-step-sub">gemini-4-argon-high</span>
-          </div>
-          <div class="relay-step-item ${isCoderDone ? 'done' : (t.assignedWorkerId === 'pi-coder' ? 'running' : '')}">
-            <span class="relay-step-title">② 编码与自测 (pi-coder)</span>
-            <span class="relay-step-sub">deepseek-v4.1-flash</span>
-          </div>
-          <div class="relay-step-item ${isCoderDone ? 'done' : ''}">
-            <span class="relay-step-title">③ 队长转审 (dev-leader)</span>
-            <span class="relay-step-sub">跨周期恢复原 Session</span>
-          </div>
-          <div class="relay-step-item ${isDone ? 'done' : (t.assignedWorkerId === 'codex-reviewer' ? 'running' : '')}">
-            <span class="relay-step-title">④ 独立审查 (codex-reviewer)</span>
-            <span class="relay-step-sub">zgca/deepseek-flash · 自动结单</span>
-          </div>
-        </div>
-
-        ${svgBanner}
-
-        <!-- 完整不截断的 Verdict 与审查报告卡片 -->
-        <div class="stage-run-card">
-          <div class="stage-run-header">
-            <span style="font-size:12.5px;font-weight:700;color:#047857;">📑 结构化准出与独立审查报告 (Verdict: ${t.latestVerdict?.state || 'progress'})</span>
-            <span style="font-size:11px;color:#64748b;">执行与审查人：@${t.assignedWorkerId || t.leaderAgentId}</span>
-          </div>
-          <div class="stage-run-body">${t.latestVerdict?.summary || '正在 sota 工作区执行中，完成后将在此展示完整审查报告...'}</div>
-          <div class="stage-run-steps">
-            <div style="font-weight:700;color:#1e293b;margin-bottom:2px;">⚡ sota 关键执行步骤记录 (${rawSteps.length} 步)：</div>
-            ${stepsLines || '<div>等待步骤返回...</div>'}
-          </div>
-        </div>
-      `;
-
-      // 渲染右侧 330px 属性与真实 sota 工作区文件查看器
-      const fileData = cachedWorktreeFiles[t.identifier];
-      const files = fileData?.files || [];
-      const worktreeDir = fileData?.worktreePath || `/home/qijinyin/multimodal/yangxin/nocturn/worktrees/${t.identifier.toLowerCase()}`;
-      const activeFile = files[selectedFileIdx] || files[0];
-
-      const fileTabsHtml = files.length > 0
-        ? files.map((f, i) => `
-            <div class="file-tab-btn ${i === selectedFileIdx ? 'active' : ''}" onclick="selectedFileIdx=${i};renderFullIssueDetailView();">
-              <span>📄 ${f.name}</span>
-              <span style="color:#64748b;font-size:10px;">${f.size} B</span>
-            </div>
-          `).join("")
-        : `<div style="font-size:11px;color:#94a3b8;">正在从 sota 读取工作区文件...</div>`;
-
-      const fileContentHtml = activeFile
-        ? `<div class="code-viewer-box">${activeFile.content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
-        : "";
-
-      document.getElementById("detailInspectorCol").innerHTML = `
-        <div class="prop-section">
-          <div class="prop-section-title"><span>任务属性 (Properties)</span></div>
-          <div class="prop-kv"><span class="prop-k">状态</span><span class="prop-v" style="cursor:pointer;color:#4f46e5;" onclick="cycleTaskStatus('${t.id}')">${t.status} ▾</span></div>
-          <div class="prop-kv"><span class="prop-k">所属小队</span><span class="prop-v">🛠️ 研发小队</span></div>
-          <div class="prop-kv"><span class="prop-k">当前负责人</span><span class="prop-v">@${t.assignedWorkerId || t.leaderAgentId}</span></div>
-          <div class="prop-kv"><span class="prop-k">关联 Issue</span><span class="prop-v" style="cursor:pointer;color:#4f46e5;" onclick="promptBindIssue('${t.id}', event)">🔗 ${t.boundIssue || t.identifier}</span></div>
-          <div style="font-size:10px;color:#64748b;word-break:break-all;background:#f8fafc;padding:6px;border-radius:6px;border:1px solid #e2e8f0;">
-            <strong>sota 目录：</strong><br/>${worktreeDir}
-          </div>
-        </div>
-
-        <div class="prop-section" style="flex:1;">
-          <div class="prop-section-title">
-            <span>📁 sota 工作区真实文件 (${files.length})</span>
-            <span style="cursor:pointer;color:#4f46e5;font-size:10.5px;" onclick="openFullIssueDetail('${t.id}')">↻ 刷新</span>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:5px;">
-            ${fileTabsHtml}
-          </div>
-          ${fileContentHtml}
-        </div>
-      `;
+      tasksData.forEach(t => {
+        const dst = pillAnchors[t.id];
+        if (!dst) return;
+        const links = [{ actorId: t.leaderAgentId, type: t.assignedWorkerId ? "waiting" : "dispatching" }];
+        if (t.assignedWorkerId) links.push({ actorId: t.assignedWorkerId, type: "running" });
+        links.forEach(l => {
+          const src = actorAnchors[l.actorId];
+          if (!src) return;
+          const span = dst.x - src.x;
+          const pathData = `M ${src.x} ${src.y} C ${src.x + span * 0.46} ${src.y}, ${dst.x - span * 0.46} ${dst.y}, ${dst.x} ${dst.y}`;
+          const color = l.type === "running" ? "#2563eb" : (l.type === "dispatching" ? "#7c3aed" : "#64748b");
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          line.setAttribute("d", pathData);
+          line.setAttribute("fill", "none");
+          line.setAttribute("stroke", color);
+          line.setAttribute("stroke-width", l.type === "waiting" ? "1.3" : "2.1");
+          line.setAttribute("opacity", l.type === "waiting" ? "0.55" : "0.92");
+          if (l.type === "waiting") line.setAttribute("stroke-dasharray", "4 4");
+          svgEl.appendChild(line);
+        });
+      });
     }
 
-    function sendFromDetailComposer() {
-      const inp = document.getElementById("detailComposerInput");
-      const val = inp.value.trim();
-      if (!val) return;
-      composerInput.value = val;
-      inp.value = "";
-      document.getElementById("sendCommentBtn").click();
+    function openCreateIssueModal() {
+      document.getElementById("createIssueModal").classList.add("open");
+      document.getElementById("modalTaskTitle").focus();
     }
-
-    // 渲染 Now 视图右侧的快览抽屉
-    function renderCompactDrawer() {
-      const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
-      if (!t) return;
-
-      const owner = t.assignedWorkerId || t.leaderAgentId || "pi-coder";
-      peekModeBadge.textContent = `${t.identifier} · @${owner}`;
-      document.getElementById("triggerChipLabel").textContent = `⚡ 对 ${owner} 插话`;
-
-      const statusLabel = t.status === "done" ? "✅ 已结单" : (t.status === "in_review" ? "待审核" : "进行中");
-      const dotClass = t.status === "in_review" || t.status === "done" ? "in_review" : (t.status === "dispatching" ? "dispatching" : "running");
-
-      peekPropsBar.innerHTML = `
-        <div class="prop-pill" onclick="cycleTaskStatus('${t.id}')">
-          <span class="task-dot ${dotClass}"></span>
-          <span>${statusLabel} ▾</span>
-        </div>
-        <div class="prop-pill" style="border-color:#c7d2fe;background:#eef2ff;color:#4338ca;" onclick="promptBindIssue('${t.id}', event)">
-          <span>🔗 ${t.boundIssue || t.identifier}</span>
-        </div>
-        <div class="prop-pill" onclick="triggerTargetedRework('${t.id}')">↩️ 返工</div>
-      `;
-
-      const svgUrl = t.svgUrl || (t.identifier === "TASK-451" ? "/api/bicycle-pelican.svg" : (t.identifier === "TASK-445" ? "/api/pelican.svg" : null));
-      const svgPreviewHtml = svgUrl ? `
-        <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#f8fafc;cursor:pointer;" onclick="openFullIssueDetail('${t.id}')" title="点击进入完整任务页查看大图与源码">
-          <img src="${API_BASE}${svgUrl}" style="width:100%;max-height:155px;object-fit:contain;display:block;" alt="SVG Preview"/>
-        </div>
-      ` : "";
-
-      const vState = t.latestVerdict?.state || "progress";
-      const vSummary = t.latestVerdict?.summary || "正在 sota 工作区执行中...";
-
-      const rawSteps = (t.steps || []).filter(s => !String(s.text).startsWith("[sota Pi 1.5.0 回复] I'll start by inspecting"));
-      const stepsHtml = rawSteps.slice(-8).map(st => {
-        const clean = compactSingleLine(st.text);
-        const isReport = st.badge === "Report" || st.badge === "report";
-        return `
-          <div class="compact-step-row" title="${String(st.text).replace(/"/g, '&quot;')}">
-            <span class="compact-step-badge ${isReport ? 'report' : ''}">${isReport ? '结论' : '步骤'}</span>
-            <span class="compact-step-text">${clean}</span>
-          </div>
-        `;
-      }).join("");
-
-      peekScrollEl.innerHTML = `
-        <h3 class="peek-issue-title" style="cursor:pointer;" onclick="openFullIssueDetail('${t.id}')">${t.title} <span style="color:#4f46e5;font-size:11px;">[点此看源码与全文 ›]</span></h3>
-        ${svgPreviewHtml}
-        <div class="verdict-box ${vState}">
-          <div class="verdict-header">
-            <span>准出结果 (Verdict: ${vState})</span>
-            <span>@${owner}</span>
-          </div>
-          <div class="verdict-summary">${vSummary.slice(0, 140)}${vSummary.length > 140 ? '…' : ''}</div>
-        </div>
-        <div class="compact-run-box">
-          <div class="compact-run-header" onclick="stepsExpanded = !stepsExpanded; renderCompactDrawer();">
-            <span>⚡ Session 步骤记录 (${rawSteps.length} 步)</span>
-            <span style="color:#64748b;font-size:10px;">${stepsExpanded ? '收起 ▲' : '展开 ▼'}</span>
-          </div>
-          <div class="compact-steps-list" style="display:${stepsExpanded ? 'flex' : 'none'}">
-            ${stepsHtml || '<div style="color:#94a3b8;">等待 sota 返回步骤...</div>'}
-          </div>
-        </div>
-      `;
+    function closeCreateIssueModal() {
+      document.getElementById("createIssueModal").classList.remove("open");
     }
-
-    function cycleTaskStatus(taskId) {
-      const t = tasksData.find(x => x.id === taskId);
-      if (!t) return;
-      t.status = t.status === "in_progress" ? "in_review" : (t.status === "in_review" ? "done" : "in_progress");
-      fetch(`${API_BASE}/api/tasks/status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: t.identifier, status: t.status })
-      }).catch(() => {});
-      syncUI();
-    }
-
-    function triggerTargetedRework(taskId) {
-      const t = tasksData.find(x => x.id === taskId);
-      if (!t) return;
-      const reason = prompt(`请输入对 ${t.identifier} 的驳回返工意见（将在 sota 上恢复原会话继续修改）：`, "请再补充一个边界测试并重新汇报");
-      if (!reason) return;
-      t.status = "in_progress";
-      t.steps.push({ badge: "步骤", text: `↩️ 驳回返工：${reason}` });
-      fetch(`${API_BASE}/api/rework`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: t.identifier, reviewer: "yangxin", reason })
-      }).catch(() => {});
-      syncUI();
+    function submitModalCreateTask() {
+      const titleEl = document.getElementById("modalTaskTitle");
+      const descEl = document.getElementById("modalTaskDesc");
+      const squadId = document.getElementById("modalSquadSelect").value;
+      const bindIssue = document.getElementById("modalBindIssue").value.trim();
+      const titleVal = titleEl.value.trim();
+      if (!titleVal) { titleEl.focus(); return; }
+      document.getElementById("quickTaskInput").value = titleVal + (descEl.value.trim() ? `（${descEl.value.trim()}）` : "");
+      document.getElementById("quickIssueBindInput").value = bindIssue;
+      titleEl.value = "";
+      descEl.value = "";
+      closeCreateIssueModal();
+      submitLiveTaskFromBar(squadId);
     }
 
     function submitLiveTaskFromBar(customSquadId) {
@@ -1577,7 +1608,16 @@
         leaderAgentId: "dev-leader",
         assignedWorkerId: null,
         latestVerdict: { state: "progress", summary: "正在唤醒 sota 上的研发队长派单..." },
-        steps: [{ badge: "步骤", text: `已提交 ${newCode} (绑定 ${boundIssue})，正在 sota 上拉起研发队长...` }]
+        runs: [
+          {
+            id: "run_init_" + Date.now(),
+            agentId: "dev-leader",
+            status: "running",
+            stageLabel: "第 1 棒 · 队长拆单",
+            summary: `正在 sota 上唤醒研发队长拆解任务 ${newCode}...`,
+            steps: [`已提交 ${newCode}，正在启动 /home/qijinyin/multimodal/yangxin/nocturn/worktrees/${newCode.toLowerCase()}...`]
+          }
+        ]
       };
       tasksData.unshift(newTask);
       selectedTaskId = newTask.id;
@@ -1597,13 +1637,44 @@
       }).catch(() => {});
     }
 
+    function cycleTaskStatus(taskId) {
+      const t = tasksData.find(x => x.id === taskId);
+      if (!t) return;
+      t.status = t.status === "in_progress" ? "in_review" : (t.status === "in_review" ? "done" : "in_progress");
+      fetch(`${API_BASE}/api/tasks/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: t.identifier, status: t.status })
+      }).catch(() => {});
+      syncUI();
+    }
+
+    function triggerTargetedRework(taskId) {
+      const t = tasksData.find(x => x.id === taskId);
+      if (!t) return;
+      const reason = prompt(`请输入对 ${t.identifier} 的驳回返工意见（将在 sota 上恢复原会话继续修改）：`, "请再补充一个边界测试并重新汇报");
+      if (!reason) return;
+      t.status = "in_progress";
+      t.runs.push({
+        id: "run_rework_" + Date.now(),
+        agentId: "pi-coder",
+        status: "running",
+        stageLabel: "返工回合 · 定向唤醒原 Session",
+        summary: `收到返工要求：「${reason}」，正在恢复原会话修改...`,
+        steps: [`↩️ 驳回返工：${reason}`]
+      });
+      fetch(`${API_BASE}/api/rework`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: t.identifier, reviewer: "yangxin", reason })
+      }).catch(() => {});
+      syncUI();
+    }
+
     function triggerLiveSotaTurn() {
       const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
       if (!t) return;
       const agentId = t.assignedWorkerId || t.leaderAgentId || "pi-coder";
-      t.steps.push({ badge: "步骤", text: `正在连接 sota 拉起 ${agentId}...` });
-      syncUI();
-
       fetch(`${API_BASE}/api/sota/exec`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1612,15 +1683,30 @@
           agentId,
           prompt: `请用一句话汇报你在任务 ${t.identifier} 工作区下的当前文件与状态。`
         })
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data && data.sotaReply) {
-            t.steps.push({ badge: "步骤", text: `回复: ${data.sotaReply}` });
-            syncUI();
-          }
-        })
-        .catch(() => {});
+      }).catch(() => {});
+    }
+
+    function promptBindIssue(taskId, ev) {
+      if (ev) ev.stopPropagation();
+      const t = tasksData.find(x => x.id === taskId);
+      if (!t) return;
+      const val = prompt(`为任务 ${t.identifier} 绑定外部或仓库 Issue：`, t.boundIssue || `nocturn#${t.identifier.replace("TASK-", "")}`);
+      if (val === null) return;
+      t.boundIssue = val.trim();
+      fetch(`${API_BASE}/api/tasks/bind-issue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: t.identifier, issueRef: t.boundIssue })
+      }).catch(() => {});
+      syncUI();
+    }
+
+    function deleteTask(taskId, identifier, ev) {
+      if (ev) ev.stopPropagation();
+      tasksData = tasksData.filter(t => t.id !== taskId && t.identifier !== identifier);
+      if (selectedTaskId === taskId && tasksData[0]) selectedTaskId = tasksData[0].id;
+      fetch(`${API_BASE}/api/tasks/${encodeURIComponent(identifier)}`, { method: "DELETE" }).catch(() => {});
+      syncUI();
     }
 
     function promptAddAgent() {
@@ -1628,14 +1714,9 @@
       if (!id) return;
       const name = prompt("显示名称：", id);
       squads[0].agents.push({
-        id,
-        name: name || id,
-        role: "组员",
-        isLeader: false,
-        sub: "deepseek-flash",
-        color: "#0284c7",
-        initials: (name || id).slice(0, 2).toUpperCase(),
-        dotType: "blue"
+        id, name: name || id, role: "组员", isLeader: false,
+        sub: "deepseek-flash", color: "#0284c7",
+        initials: (name || id).slice(0, 2).toUpperCase(), dotType: "blue"
       });
       fetch(`${API_BASE}/api/agents`, {
         method: "POST",
@@ -1645,195 +1726,57 @@
       syncUI();
     }
 
-    function syncUI() {
-      document.getElementById("totalTaskCount").textContent = String(tasksData.length);
-      document.getElementById("navCountNow").textContent = String(tasksData.length);
-      document.getElementById("navCountIssues").textContent = String(tasksData.length);
-      document.getElementById("clearSpotlightBtn").style.display = (selectedActorId || selectedSquadId) ? "inline-flex" : "none";
-
-      renderSidebarAgents();
-      if (centerTab === "detail") {
-        renderFullIssueDetailView();
-        return;
-      }
-      renderIssuesBoard();
-      renderCompactDrawer();
-
-      leftCol.innerHTML = "";
-      squads.forEach(s => {
-        const pod = document.createElement("div");
-        const dimmed = selectedSquadId && selectedSquadId !== s.id;
-        pod.className = "squad-pod" + (selectedSquadId === s.id ? " focused-pod" : "") + (dimmed ? " dimmed-pod" : "");
-
-        const header = document.createElement("div");
-        header.className = "squad-pod-header";
-        header.innerHTML = `
-          <span class="squad-pod-name"><span class="squad-pod-dot" style="background:${s.color}"></span>${s.name}</span>
-          <span class="squad-pod-tag">${s.agents.length}人</span>
-        `;
-        header.addEventListener("click", () => selectSquadLeader(s.id));
-        pod.appendChild(header);
-
-        s.agents.forEach(a => {
-          const node = document.createElement("div");
-          const isSelected = selectedActorId === a.id;
-          const isDim = (selectedActorId && selectedActorId !== a.id) || (selectedSquadId && selectedSquadId !== s.id);
-          node.className = "actor-node" + (a.isLeader ? "" : " worker-indent") + (isSelected ? " selected-actor" : "") + (isDim ? " dimmed-actor" : "");
-          node.dataset.actorId = a.id;
-
-          node.innerHTML = `
-            <div class="actor-left">
-              <div class="actor-avatar" style="background:${a.color}">${a.initials}</div>
-              <div>
-                <div class="actor-name">${a.name}</div>
-                <div class="actor-sub">${a.sub}</div>
-              </div>
-            </div>
-            <span class="origin-dot ${a.dotType === 'blue' ? 'blue' : ''}"></span>
-          `;
-          node.addEventListener("mouseenter", () => { hoveredActorId = a.id; drawCurves(); });
-          node.addEventListener("mouseleave", () => { hoveredActorId = null; drawCurves(); });
-          node.addEventListener("click", (e) => { e.stopPropagation(); selectWorker(a.id); });
-          pod.appendChild(node);
-        });
-        leftCol.appendChild(pod);
-      });
-
-      rightCol.innerHTML = "";
-      tasksData.forEach(t => {
-        const el = document.createElement("div");
-        const isSelected = t.id === selectedTaskId;
-        const isDim = (selectedSquadId && t.squadId !== selectedSquadId) ||
-          (selectedActorId && t.assignedWorkerId !== selectedActorId && t.leaderAgentId !== selectedActorId);
-        el.className = "task-pill" + (isSelected ? " selected-pill" : "") + (isDim ? " dimmed-pill" : "");
-        el.dataset.pillId = t.id;
-
-        const dotClass = t.status === "in_review" || t.status === "done" ? "in_review" : (t.status === "dispatching" ? "dispatching" : "running");
-        const badgeClass = t.status === "in_review" || t.status === "done" ? "ready" : (t.status === "dispatching" ? "dispatch" : "progress");
-        const badgeText = t.status === "done" ? "✅ 已自动结单" : (t.status === "in_review" ? "⚠️ 待你拍板" : (t.assignedWorkerId ? `${t.assignedWorkerId} 执行中` : "队长派单中"));
-        const issueLabel = t.boundIssue ? `🔗 ${t.boundIssue}` : `+ 绑定 Issue`;
-
-        el.innerHTML = `
-          <div class="task-pill-left">
-            <span class="task-dot ${dotClass}"></span>
-            <span class="task-title">${t.title}</span>
-          </div>
-          <span class="issue-bind-chip" onclick="promptBindIssue('${t.id}', event)" title="点击绑定或修改关联的 GitHub Issue">${issueLabel}</span>
-          <span class="verdict-mini-badge ${badgeClass}">${badgeText}</span>
-          <span class="open-detail-chip" onclick="event.stopPropagation();openFullIssueDetail('${t.id}')" title="展开 Multica 双栏完整详情页与源码查看器">⤢ 详情</span>
-        `;
-        el.addEventListener("mouseenter", () => { hoveredPillId = t.id; drawCurves(); });
-        el.addEventListener("mouseleave", () => { hoveredPillId = null; drawCurves(); });
-        el.addEventListener("click", () => selectTask(t.id));
-        el.addEventListener("dblclick", () => openFullIssueDetail(t.id));
-        rightCol.appendChild(el);
-      });
-
-      requestAnimationFrame(drawCurves);
-    }
-
-    function drawCurves() {
-      if (centerTab !== "now") return;
-      const stageRect = stageEl.getBoundingClientRect();
-      if (stageRect.width === 0) return;
-      const actorAnchors = {};
-      const pillAnchors = {};
-
-      leftCol.querySelectorAll(".actor-node").forEach(node => {
-        const dotEl = node.querySelector(".origin-dot");
-        const r = dotEl.getBoundingClientRect();
-        actorAnchors[node.dataset.actorId] = {
-          x: r.left - stageRect.left + r.width / 2,
-          y: r.top - stageRect.top + r.height / 2
-        };
-      });
-
-      rightCol.querySelectorAll(".task-pill").forEach(el => {
-        const r = el.getBoundingClientRect();
-        pillAnchors[el.dataset.pillId] = {
-          x: r.left - stageRect.left,
-          y: r.top - stageRect.top + r.height / 2
-        };
-      });
-
-      svgEl.setAttribute("viewBox", `0 0 ${stageRect.width} ${stageRect.height}`);
-      svgEl.innerHTML = "";
-
-      tasksData.forEach(t => {
-        const dst = pillAnchors[t.id];
-        if (!dst) return;
-        const links = [{ actorId: t.leaderAgentId, type: t.assignedWorkerId ? "waiting" : "dispatching" }];
-        if (t.assignedWorkerId) links.push({ actorId: t.assignedWorkerId, type: "running" });
-
-        links.forEach(l => {
-          const src = actorAnchors[l.actorId];
-          if (!src) return;
-          const span = dst.x - src.x;
-          const pathData = `M ${src.x} ${src.y} C ${src.x + span * 0.46} ${src.y}, ${dst.x - span * 0.46} ${dst.y}, ${dst.x} ${dst.y}`;
-
-          const dimmed = (hoveredActorId && hoveredActorId !== l.actorId) ||
-            (hoveredPillId && hoveredPillId !== t.id) ||
-            (selectedActorId && selectedActorId !== l.actorId) ||
-            (selectedSquadId && t.squadId !== selectedSquadId);
-
-          const color = l.type === "running" ? "#2563eb" : (l.type === "dispatching" ? "#7c3aed" : "#64748b");
-          const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          line.setAttribute("d", pathData);
-          line.setAttribute("fill", "none");
-          line.setAttribute("stroke", color);
-          line.setAttribute("stroke-width", dimmed ? "1.1" : (l.type === "waiting" ? "1.4" : "2.2"));
-          line.setAttribute("opacity", dimmed ? "0.15" : (l.type === "waiting" ? "0.6" : "0.95"));
-          if (l.type === "waiting") line.setAttribute("stroke-dasharray", "4 4");
-          svgEl.appendChild(line);
-        });
-      });
-    }
-
     document.getElementById("sendCommentBtn").addEventListener("click", () => {
-      const val = composerInput.value.trim();
+      const inp = document.getElementById("composerInput");
+      const val = inp.value.trim();
       if (!val) return;
       const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
       if (!t) return;
       const targetAgent = t.assignedWorkerId || t.leaderAgentId || "pi-coder";
-      t.steps.push({ badge: "步骤", text: `⚡ 你对 ${targetAgent} 插话: ${val}` });
-      composerInput.value = "";
+      t.runs.push({
+        id: "run_msg_" + Date.now(),
+        agentId: targetAgent,
+        status: "running",
+        stageLabel: "人类插话回合",
+        summary: `你对 @${targetAgent} 插话：「${val}」`,
+        steps: [`⚡ Input (delivered): ${val}`]
+      });
+      inp.value = "";
       syncUI();
 
       fetch(`${API_BASE}/api/sota/exec`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ taskId: t.identifier, agentId: targetAgent, prompt: val })
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data && data.sotaReply) {
-            t.steps.push({ badge: "步骤", text: `回复: ${data.sotaReply}` });
-            syncUI();
-          }
-        })
-        .catch(() => {});
+      }).catch(() => {});
     });
 
     document.getElementById("quickTaskInput").addEventListener("keydown", (e) => {
       if (e.key === "Enter") submitLiveTaskFromBar();
     });
 
-    const frameEl = document.getElementById("workspaceFrame");
-    function toggleSidebar() {
-      frameEl.classList.toggle("sidebar-collapsed");
-      setTimeout(() => requestAnimationFrame(drawCurves), 180);
+    function syncUI() {
+      const filtered = getFilteredTasks();
+      renderSidebar();
+      if (surfaceMode === "list") renderGroupedListView(filtered);
+      else if (surfaceMode === "board") renderBoardView(filtered);
+      else renderNowGraph(filtered);
+      renderTaskDetailDrawer();
     }
-    document.getElementById("collapseSidebarBtn").addEventListener("click", toggleSidebar);
-    document.getElementById("toggleSidebarRailBtn").addEventListener("click", toggleSidebar);
 
+    // 后端 SSE 实时同步：严格保持每个 Task 下面的 `runs` 数组结构（不混为一谈！）
     function applyBackendSnapshot(snap) {
       if (!snap || !Array.isArray(snap.tasks) || snap.tasks.length === 0) return;
       tasksData = snap.tasks.map(t => {
-        const taskRuns = (snap.runs || []).filter(r => r.taskId === t.id);
-        const allSteps = [];
-        taskRuns.forEach(r => {
-          (r.steps || []).forEach(st => allSteps.push(st));
-        });
+        const rawRuns = (snap.runs || []).filter(r => r.taskId === t.id);
+        const mappedRuns = rawRuns.map((r, idx) => ({
+          id: r.id,
+          agentId: r.agentId,
+          status: r.status,
+          stageLabel: `第 ${idx + 1} 棒 · ${AGENT_META[r.agentId]?.role || r.agentId}`,
+          summary: r.verdict?.summary || r.summary,
+          steps: (r.steps || []).map(st => st.text)
+        }));
         return {
           id: t.id,
           identifier: t.identifier,
@@ -1845,12 +1788,16 @@
           assignedWorkerId: t.assignedWorkerId,
           svgUrl: t.identifier === "TASK-451" ? "/api/bicycle-pelican.svg" : (t.identifier === "TASK-445" ? "/api/pelican.svg" : null),
           latestVerdict: t.latestVerdict,
-          steps: allSteps
+          runs: mappedRuns
         };
       });
 
       if (!tasksData.some(x => x.id === selectedTaskId) && tasksData[0]) {
         selectedTaskId = tasksData[0].id;
+      }
+      const curTask = tasksData.find(x => x.id === selectedTaskId);
+      if (curTask && !cachedWorktreeFiles[curTask.identifier]) {
+        fetchWorktreeFiles(curTask.identifier);
       }
       syncUI();
     }
