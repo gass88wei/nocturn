@@ -918,12 +918,13 @@
         boundIssue: "nocturn#448",
         title: "#448 编写 string-utils.js (reverse 与 isPalindrome) 并交由 Reviewer 审查",
         squadId: "dev",
-        status: "in_review",
+        status: "done",
         leaderAgentId: "dev-leader",
         assignedWorkerId: "codex-reviewer",
         latestVerdict: {
           state: "ready",
-          summary: "VERDICT: APPROVE（无阻塞问题，可合入）。独立复跑 node string-utils.test.js 13/13 通过，并抽查代理对 emoji、NFKC 归一化与异常边界全部通过。"
+          risk: "low",
+          summary: "VERDICT: APPROVE（低风险常规任务，Reviewer 独立复跑 13/13 单测通过，系统已自动验收结单 Auto-Done）。"
         },
         leaderNote: "pi-coder 完成实现后自动唤醒队长，已转交 @codex-reviewer 完成独立代码审查。",
         steps: [
@@ -1131,7 +1132,7 @@
       }
 
       container.innerHTML = filtered.map(t => {
-        const statusText = t.status === "in_review" ? "待审核 (ready)" : (t.status === "done" ? "已完成" : (t.status === "dispatching" ? "队长派单中" : "执行中"));
+        const statusText = t.status === "done" ? "✅ 自动结单 (Auto-Done)" : (t.status === "in_review" ? "⚠️ 高风险待你审核" : (t.status === "dispatching" ? "队长派单中" : "执行中"));
         const badgeClass = t.status === "in_review" || t.status === "done" ? "ready" : (t.status === "dispatching" ? "dispatch" : "progress");
         const owner = t.assignedWorkerId || t.leaderAgentId;
         const summary = t.latestVerdict?.summary || "正在 sota 上执行中...";
@@ -1489,9 +1490,9 @@
         el.className = "task-pill" + (isSelected ? " selected-pill" : "") + (isDim ? " dimmed-pill" : "");
         el.dataset.pillId = t.id;
 
-        const dotClass = t.status === "in_review" ? "in_review" : (t.status === "dispatching" ? "dispatching" : "running");
+        const dotClass = t.status === "in_review" || t.status === "done" ? "in_review" : (t.status === "dispatching" ? "dispatching" : "running");
         const badgeClass = t.status === "in_review" || t.status === "done" ? "ready" : (t.status === "dispatching" ? "dispatch" : "progress");
-        const badgeText = t.status === "in_review" ? "待审核 (ready)" : (t.status === "done" ? "已完成" : (t.assignedWorkerId ? `${t.assignedWorkerId} 执行中` : "队长派单中"));
+        const badgeText = t.status === "done" ? "✅ 已自动结单" : (t.status === "in_review" ? "⚠️ 待你拍板" : (t.assignedWorkerId ? `${t.assignedWorkerId} 执行中` : "队长派单中"));
         const issueLabel = t.boundIssue ? `🔗 ${t.boundIssue}` : `+ 绑定 Issue`;
 
         el.innerHTML = `

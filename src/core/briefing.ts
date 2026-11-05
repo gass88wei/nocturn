@@ -87,9 +87,11 @@ ${prevVerdictSection}${inputsSection}
 ## 汇报与协作原语（通过 bash 工具调用）
 1. 汇报进度或提出需要人类拍板的问题（可边提问边继续干确定性的活）：
    \`nocturn report --task ${task.identifier} --agent ${worker.id} --state progress --summary "<当前进展>" --human-action "<一句话拍板问题>"\`
-2. 完成工作并提交准出 Verdict（若附带 --pr 会自动绑定 PR 事件绿色通道）：
-   \`nocturn report --task ${task.identifier} --agent ${worker.id} --state ready --summary "<完成摘要与测试结果>" --pr <PR编号>\`
-3. 若收到的评论超出本任务范围，退回给队长另建新任务：
+2. 完成工作并提交准出 Verdict（常规确定性任务且单测通过默认 \`--risk low\`，经 Reviewer 审查通过后系统将**自动结单为已完成 done，无需打扰人类验收**；仅当涉及高风险破坏性变更、架构拍板或无法自动验证时传 \`--risk high\` 停在待人类审核）：
+   \`nocturn report --task ${task.identifier} --agent ${worker.id} --state ready --risk low --summary "<完成摘要与测试结果>" --pr <PR编号>\`
+3. 若你是审查员（codex-reviewer）且发现代码或测试有缺陷，直接调用 \`--state rework\` **自动打回给 pi-coder 原会话返工**（无需人类介入）：
+   \`nocturn report --task ${task.identifier} --agent ${worker.id} --state rework --summary "<具体缺陷与返工要求>"\`
+4. 若收到的评论超出本任务范围，退回给队长另建新任务：
    \`nocturn handback --task ${task.identifier} --trigger <triggerId> --reason "<越界说明>"\`
 `;
 }

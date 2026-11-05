@@ -9,7 +9,7 @@
  * 5. `nocturn note`     — Squad Leader sends a context-only note to a running Worker Session
  */
 import type { NocturnEngine } from "../core/engine.ts";
-import type { VerdictState } from "../core/model.ts";
+import type { RiskLevel, VerdictState } from "../core/model.ts";
 
 export type NocturnCliCommand = "report" | "handback" | "dispatch" | "fanout" | "note";
 
@@ -24,6 +24,7 @@ export function executeAgentCliCommand(
       const agentId = String(args.agent ?? "");
       const state = String(args.state ?? "progress") as VerdictState;
       const summary = String(args.summary ?? "");
+      const risk = (args.risk === "high" ? "high" : "low") as RiskLevel;
       const humanAction =
         args.human_action === "null"
           ? null
@@ -36,6 +37,7 @@ export function executeAgentCliCommand(
         agentId,
         state,
         summary,
+        risk,
         humanAction,
         prNumber,
       });

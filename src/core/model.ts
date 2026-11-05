@@ -36,11 +36,21 @@ export type TaskStatus =
   | "blocked"
   | "done";
 
-export type VerdictState = "progress" | "ready" | "blocked" | "failed" | "dropped";
+export type VerdictState =
+  | "progress"
+  | "ready"
+  | "rework"
+  | "blocked"
+  | "failed"
+  | "dropped";
+
+export type RiskLevel = "low" | "high";
 
 export interface VerdictReport {
   state: VerdictState;
   summary: string;
+  /** Risk classification: 'low' (routine/covered by tests -> auto-done) vs 'high' (needs human approval) */
+  risk?: RiskLevel;
   /** Structured one-sentence question for human decision (can coexist with state='progress') */
   humanAction?: string | null;
   /** Associated GitHub PR number; automatically binds PR thread subscription */

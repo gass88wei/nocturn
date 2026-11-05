@@ -5,6 +5,7 @@ import type {
   AttentionRequest,
   ExternalTrigger,
   InputDeliveryMode,
+  RiskLevel,
   RunTraceStep,
   Task,
   TaskInput,
@@ -367,6 +368,7 @@ export class NocturnEngine {
     agentId: string;
     state: VerdictState;
     summary: string;
+    risk?: RiskLevel;
     humanAction?: string | null;
     humanActionOptions?: string[];
     prNumber?: number | null;
@@ -388,9 +390,11 @@ export class NocturnEngine {
       }
 
       const now = new Date().toISOString();
+      const risk: RiskLevel = params.risk ?? "low";
       const verdict = {
         state: params.state,
         summary: params.summary,
+        risk,
         humanAction: params.humanAction ?? null,
         prNumber: params.prNumber ?? null,
         confidence: params.confidence,
@@ -447,7 +451,24 @@ export class NocturnEngine {
         }
       }
 
-      // Advance Task status & trigger Squad Leader Join Gate / Reviewer handoff on ready / blocked
+      // Advance Task status & trigger Squad Leader Join Gate / Reviewer handoff / Autonomous Rework / Auto-Done
+      if (params.state === "rework") {
+        // Reviewer found defects -> automatically route back to pi-coder's original Session without bothering human!
+        task.status = "in_progress";
+        task.assignedWorkerId = "pi-coder";
+        task.updatedAt = now;
+        this.store.saveTask(task);
+        this.sendInput({
+          taskId: task.id,
+          targetAgentId: "pi-coder",
+          author: params.agentId,
+          mode: "rework",
+          text: `[审查自动打回 Rework] ${params.agentId} 发现问题要求返工：${params.summary}`,
+        });
+        this.notifyChange();
+        return task;
+      }
+
       if (params.state === "ready") {
         const hasReviewerInSquad = this.store
           .listAgents()
@@ -464,15 +485,21 @@ export class NocturnEngine {
             taskId: task.id,
             leaderAgentId: task.leaderAgentId,
             autoSpawnLeader: true,
-            reason: `编码组员 ${params.agentId} 已完成代码编写并上报 Verdict=ready（${params.summary}）。请立即调用 nocturn dispatch --task ${task.identifier} --to codex-reviewer --order "请审查 ${task.identifier} 工作区下的代码与测试，执行测试验证通过后调用 nocturn report --task ${task.identifier} --agent codex-reviewer --state ready --summary '<审查结论>' 交付" 将任务转交给审查员 codex-reviewer！`,
+            reason: `编码组员 ${params.agentId} 已完成代码编写并上报 Verdict=ready（${params.summary}）。请立即调用 nocturn dispatch --task ${task.identifier} --to codex-reviewer --order "请审查 ${task.identifier} 工作区下的代码与测试：若验证通过且无高风险变更，调用 nocturn report --task ${task.identifier} --agent codex-reviewer --state ready --risk low --summary '<审查结论>' 直接自动结单；若发现缺陷需要修改，调用 nocturn report --task ${task.identifier} --agent codex-reviewer --state rework --summary '<具体修改意见>' 自动打回给 pi-coder 返工；若涉及高风险架构/安全变更需人类确认，传 --risk high" 将任务转交给审查员 codex-reviewer！`,
           });
         } else {
-          task.status = "in_review";
+          // Final Reviewer or standalone worker finished:
+          // Risk-Stratified Auto-Merge/Close: low-risk & no pending human question -> auto-close (`done`)!
+          // High-risk -> pause at `in_review` for human approval.
+          const needsHumanReview = risk === "high" || Boolean(task.pendingAttention);
+          task.status = needsHumanReview ? "in_review" : "done";
           this.store.enqueueEffect("wake_leader", `wake:${task.id}:ready:${now}`, {
             taskId: task.id,
             leaderAgentId: task.leaderAgentId,
             autoSpawnLeader: false,
-            reason: `组员 ${params.agentId} 提交最终准出 Verdict=ready: ${params.summary}`,
+            reason: needsHumanReview
+              ? `[高风险待人类验收] ${params.agentId} 提交 Verdict=ready (risk=high): ${params.summary}`
+              : `[自动验收结单 Auto-Done] ${params.agentId} 独立审查通过 (risk=low)，系统已自动将任务标为已完成 (done)！摘要: ${params.summary}`,
           });
         }
 
@@ -481,11 +508,10 @@ export class NocturnEngine {
           const siblings = this.store
             .listTasks()
             .filter((t) => t.parentTaskId === task.parentTaskId);
-          const allReady = siblings.every(
-            (s) =>
-              (s.id === task.id ? "in_review" : s.status) === "in_review" ||
-              s.status === "done"
-          );
+          const allReady = siblings.every((s) => {
+            const st = s.id === task.id ? task.status : s.status;
+            return st === "in_review" || st === "done";
+          });
           if (allReady) {
             const parentTask = this.store.getTask(task.parentTaskId);
             if (parentTask) {
@@ -719,10 +745,15 @@ export class NocturnEngine {
 
       const matchedTasks = this.store
         .listTasks()
-        .filter((t) => t.subscribedThreads.includes(params.threadKey) && t.status !== "done");
+        .filter((t) => t.subscribedThreads.includes(params.threadKey));
 
       const routedToTaskIds: string[] = [];
       for (const t of matchedTasks) {
+        if (t.status === "done" || t.status === "in_review") {
+          t.status = "in_progress";
+          t.updatedAt = new Date().toISOString();
+          this.store.saveTask(t);
+        }
         const targetAgent = t.assignedWorkerId ?? t.leaderAgentId;
         this.sendInput({
           taskId: t.id,

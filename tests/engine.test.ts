@@ -86,12 +86,13 @@ describe("Nocturn Core Engine & Distilled Mechanisms", () => {
       "Reporting PR number automatically subscribes task to github:pr:112"
     );
 
-    // 4. Worker finishes Run 1 with Verdict=ready -> Run 1 exits, Task enters in_review
+    // 4. Worker finishes Run 1 with Verdict=ready (no reviewer in squad -> auto-closes as done when risk=low; high-risk enters in_review)
     executeAgentCliCommand(engine, "report", {
       task: task.id,
       agent: "pi-coder",
       state: "ready",
-      summary: "单测全部通过，PR #112 就绪",
+      risk: "high",
+      summary: "单测全部通过，PR #112 就绪（架构变更请人类确认）",
       human_action: "null",
     });
 
@@ -324,7 +325,7 @@ describe("Nocturn Core Engine & Distilled Mechanisms", () => {
     });
     assert.equal(store.getTask(parent.id)!.status, "in_progress");
 
-    // Subtask 2 reports ready -> Join Gate satisfied! Parent advances to in_review & wakes Leader!
+    // Subtask 2 reports ready -> Join Gate satisfied! Parent advances & wakes Leader!
     engine.reportVerdict({
       taskId: children[1].id,
       agentId: "codex-reviewer",
@@ -342,5 +343,67 @@ describe("Nocturn Core Engine & Distilled Mechanisms", () => {
     assert.ok(leaderPrompt.includes("TASK-500-FE") && leaderPrompt.includes("TASK-500-BE"));
     const workerPrompt = runner.buildBriefingForTaskAgent(children[0].id, "pi-coder");
     assert.ok(workerPrompt.includes("nocturn report"));
+  });
+
+  it("Risk-Stratified Autonomous Acceptance & Agent-to-Agent Rework: Reviewer auto-reworks Coder on defects and auto-closes (done) low-risk tasks without bothering human", () => {
+    const { store, engine } = setupSeededEngine();
+    engine.upsertAgent({
+      id: "codex-reviewer",
+      name: "codex-reviewer",
+      squadId: "dev",
+      role: "worker",
+      cli: "pi",
+      model: "zgca/deepseek-flash",
+      skills: ["review"],
+      instructions: "负责代码与测试独立审查",
+    });
+
+    const task = engine.createTask({
+      identifier: "TASK-600",
+      title: "实现自动结单与自动打回闭环",
+      squadId: "dev",
+    });
+    engine.dispatchTask({ taskId: task.id, workerAgentId: "pi-coder", orderText: "实现代码" });
+    engine.reportVerdict({
+      taskId: task.id,
+      agentId: "pi-coder",
+      state: "ready",
+      summary: "初版完成",
+    });
+
+    // Leader hands off to codex-reviewer
+    engine.dispatchTask({ taskId: task.id, workerAgentId: "codex-reviewer", orderText: "审查代码" });
+
+    // 1. Reviewer finds a bug and reports state='rework' -> automatically wakes pi-coder without bothering human!
+    executeAgentCliCommand(engine, "report", {
+      task: task.id,
+      agent: "codex-reviewer",
+      state: "rework",
+      summary: "缺少空串边界断言，请补充",
+    });
+    const reworkedTask = store.getTask(task.id)!;
+    assert.equal(reworkedTask.status, "in_progress");
+    assert.equal(reworkedTask.assignedWorkerId, "pi-coder", "Task automatically routed back to pi-coder");
+    const coderSession = store.getSessionByPair("pi-coder", task.id)!;
+    assert.notEqual(coderSession.activeRunId, null, "pi-coder session automatically resumed for rework");
+
+    // 2. Coder fixes and reports ready -> Leader hands off to codex-reviewer -> Reviewer reports ready (risk=low) -> AUTO-DONE!
+    engine.reportVerdict({
+      taskId: task.id,
+      agentId: "pi-coder",
+      state: "ready",
+      summary: "已补充空串单测",
+    });
+    engine.dispatchTask({ taskId: task.id, workerAgentId: "codex-reviewer", orderText: "复审" });
+    executeAgentCliCommand(engine, "report", {
+      task: task.id,
+      agent: "codex-reviewer",
+      state: "ready",
+      risk: "low",
+      summary: "复审通过，100% 单测覆盖，自动结单",
+    });
+
+    const finalTask = store.getTask(task.id)!;
+    assert.equal(finalTask.status, "done", "Low-risk Reviewer-approved task automatically closes as done without bothering human");
   });
 });
