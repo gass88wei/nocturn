@@ -406,4 +406,43 @@ describe("Nocturn Core Engine & Distilled Mechanisms", () => {
     const finalTask = store.getTask(task.id)!;
     assert.equal(finalTask.status, "done", "Low-risk Reviewer-approved task automatically closes as done without bothering human");
   });
+
+  it("Dual Execution Mode (Local / SSH) & Isolated Git Branch Worktree Initialization", () => {
+    const { engine } = setupSeededEngine();
+    const localRunner = new SotaPiRunner(engine, {
+      execMode: "local",
+      baseDir: "/tmp/nocturn-test-local",
+      dryRun: true,
+    });
+    const localCmd = localRunner.buildSotaPiCommand({
+      worktreePath: "/tmp/nocturn-test-local/worktrees/task-700",
+      piSessionId: "00000000-0000-0000-0000-000000000700",
+      prompt: "test local execution",
+    });
+    assert.equal(localCmd.bin, "sh");
+    assert.ok(
+      localCmd.args[1].includes('git -C /tmp/nocturn-test-local/worktrees/task-700 init -b "$b"'),
+      "Local mode command automatically initializes isolated Git branch nocturn/<slug>"
+    );
+
+    const sshRunner = new SotaPiRunner(engine, {
+      execMode: "ssh",
+      baseDir: "/home/qijinyin/multimodal/yangxin/nocturn",
+      sshHost: "root@115.190.90.101",
+      sshPort: 10780,
+      dryRun: true,
+    });
+    const sshCmd = sshRunner.buildSotaPiCommand({
+      worktreePath: "/home/qijinyin/multimodal/yangxin/nocturn/worktrees/task-700",
+      piSessionId: "00000000-0000-0000-0000-000000000700",
+      prompt: "test ssh execution",
+    });
+    assert.equal(sshCmd.bin, "ssh");
+    assert.ok(
+      sshCmd.args[sshCmd.args.length - 1].includes(
+        'git -C /home/qijinyin/multimodal/yangxin/nocturn/worktrees/task-700 init -b "$b"'
+      ),
+      "SSH mode command initializes isolated Git branch inside sota worktree"
+    );
+  });
 });

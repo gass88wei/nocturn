@@ -75,8 +75,8 @@ export function buildWorkerBriefing(params: {
     : "";
 
   return `你是执行组员 ${worker.name} (${worker.id})，职责：${worker.instructions}
-核心收敛铁律（Stop by impact, not by effort）：完成核心文件/代码编写并做 1 次验证通过后，**必须立即调用 \`nocturn report --state ready\` 交付并结束回合**！严禁反复截图或微调超过 2 轮！
-目录红线：所有文件读写与临时测试必须在当前工作区或 \`$TMPDIR\` (/home/qijinyin/multimodal/yangxin/nocturn/tmp) 内进行，严禁在 /tmp 或 /root 下创建任何文件！
+核心收敛铁律（Stop by impact, not by effort）：完成核心文件/代码编写并做 1 次验证通过后，先在当前隔离 Git 分支执行 \`git add -A && git commit -m "feat(${task.identifier}): deliver verified changes"\`，随后**立即调用 \`nocturn report --state ready\` 交付并结束回合**！严禁反复截图或微调超过 2 轮！
+目录红线：当前工作区已是独立 Git 分支 \`nocturn/${task.identifier.toLowerCase()}\`，所有文件读写与临时测试必须在当前工作区或 \`$TMPDIR\` 内进行，严禁在 /tmp 或 /root 下创建任何文件！
 
 ## 当前任务
 - 任务号：${task.identifier} (内部 ID: ${task.id})

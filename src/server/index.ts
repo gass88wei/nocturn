@@ -196,18 +196,27 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
         }
       }
 
-      // Live sota worktree file explorer API: returns files and source code for a Task
+      // Live worktree file & Git branch explorer API (supports both SSH sota mode and Local mode)
       if (req.method === "GET" && url.pathname === "/api/worktree-files") {
         const taskCode = String(url.searchParams.get("task") ?? "TASK-451")
           .toLowerCase()
           .replace(/[^a-z0-9_-]/g, "");
+        const baseWorktrees = `${runner.options.baseDir}/worktrees`;
         const pyScript = `
-import os, json, glob
-base = "/home/qijinyin/multimodal/yangxin/nocturn/worktrees"
+import os, json, glob, subprocess
+base = ${JSON.stringify(baseWorktrees)}
 slug = "${taskCode}"
 dirs = sorted(glob.glob(base + "/" + slug + "*"))
 out = []
 wdir = dirs[0] if dirs else (base + "/" + slug)
+git_branch = ""
+git_commit = ""
+if os.path.isdir(wdir):
+    try:
+        git_branch = subprocess.check_output(["git", "-C", wdir, "rev-parse", "--abbrev-ref", "HEAD"], stderr=subprocess.DEVNULL).decode().strip()
+        git_commit = subprocess.check_output(["git", "-C", wdir, "log", "-1", "--oneline"], stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        pass
 for d in dirs:
     for entry in sorted(os.listdir(d)):
         if entry.startswith("."): continue
@@ -215,16 +224,12 @@ for d in dirs:
         if os.path.isfile(fp) and os.path.getsize(fp) < 200000:
             with open(fp, "r", encoding="utf-8", errors="replace") as f:
                 out.append({"name": entry, "path": fp, "size": os.path.getsize(fp), "content": f.read()})
-print(json.dumps({"worktreePath": wdir, "files": out}))
+print(json.dumps({"worktreePath": wdir, "gitBranch": git_branch, "gitCommit": git_commit, "files": out}))
 `;
-        const { stdout } = await execFileAsync("ssh", [
-          "-p",
-          String(runner.options.sshPort),
-          "-o",
-          `ControlPath=${runner.options.sshControlSocket}`,
-          runner.options.sshHost,
-          `python3 -c '${pyScript.replace(/'/g, "'\\''")}'`,
-        ]);
+        const execSpec = runner.buildShellExec(
+          `python3 -c '${pyScript.replace(/'/g, "'\\''")}'`
+        );
+        const { stdout } = await execFileAsync(execSpec.bin, execSpec.args);
         res.writeHead(200, {
           "Content-Type": "application/json; charset=utf-8",
           "Access-Control-Allow-Origin": "*",

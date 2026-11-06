@@ -938,6 +938,7 @@
         .then(data => {
           if (data && Array.isArray(data.files)) {
             cachedWorktreeFiles[taskCode] = data;
+            renderIssueHeader();
             renderDeliverablesCard();
           }
         })
@@ -972,7 +973,10 @@
     function renderIssueHeader() {
       const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
       if (!t) return;
-      const worktreeDir = `/home/qijinyin/multimodal/yangxin/nocturn/worktrees/${t.identifier.toLowerCase()}`;
+      const wtInfo = cachedWorktreeFiles[t.identifier];
+      const worktreeDir = wtInfo?.worktreePath || `/home/qijinyin/multimodal/yangxin/nocturn/worktrees/${t.identifier.toLowerCase()}`;
+      const gitBranch = wtInfo?.gitBranch || `nocturn/${t.identifier.toLowerCase()}`;
+      const gitCommit = wtInfo?.gitCommit ? ` · ${wtInfo.gitCommit}` : "";
       const stLabel = t.status === "done" ? "✅ 已自动结单 (Auto-Done)" : (t.status === "in_review" ? "⚠️ 待你拍板" : "🟢 sota 正在执行");
 
       document.getElementById("issueHeaderCard").innerHTML = `
@@ -980,6 +984,7 @@
           <div class="issue-header-badges">
             <span class="issue-nav-code" style="font-size:12px;">${t.identifier}</span>
             <span class="issue-bind-chip" onclick="promptBindIssue('${t.id}')" title="点击修改绑定的外部 Issue">🔗 ${t.boundIssue || t.identifier}</span>
+            <span class="worktree-badge" style="color:#047857;border-color:#a7f3d0;background:#ecfdf5;">🌿 ${gitBranch}${gitCommit}</span>
             <span class="worktree-badge">📁 ${worktreeDir}</span>
           </div>
           <h1 class="issue-title-main">${t.title}</h1>

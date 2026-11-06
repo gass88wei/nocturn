@@ -1,27 +1,36 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import type { NocturnEngine } from "../core/engine.ts";
 import { buildLeaderBriefing, buildWorkerBriefing } from "../core/briefing.ts";
 
-export const SOTA_BASE_DIR = "/home/qijinyin/multimodal/yangxin/nocturn";
-export const LEADER_MODEL = "Deepseek-V4.1-Flash/gemini-4-argon-high";
+export const SOTA_BASE_DIR =
+  process.env.NOCTURN_BASE_DIR ??
+  process.env.NOCTURN_SOTA_WORKDIR ??
+  "/home/qijinyin/multimodal/yangxin/nocturn";
+export const LEADER_MODEL =
+  process.env.NOCTURN_LEADER_MODEL ?? "Deepseek-V4.1-Flash/gemini-4-argon-high";
 export const WORKER_MODELS = [
   "Deepseek-V4.1-Flash/deepseek-v4.1-flash",
   "zgca/deepseek-flash",
 ] as const;
 
 export interface SotaPiRunnerOptions {
-  /** SSH target for remote sota execution (never executes agent sessions on local Mac) */
+  /** Execution mode: 'ssh' (remote sota box) or 'local' (local machine with `pi` CLI) */
+  execMode?: "ssh" | "local";
+  /** Base runtime directory containing worktrees/, sessions/, tmp/, bin/ */
+  baseDir?: string;
+  /** SSH target for remote sota execution */
   sshHost?: string;
   sshPort?: number;
   sshControlSocket?: string;
   dryRun?: boolean;
-  /** When true, newly enqueued Runs automatically spawn Pi 1.5.0 on sota in the background */
+  /** When true, newly enqueued Runs automatically spawn Pi 1.5.0 in the background */
   autoSpawnOnSota?: boolean;
 }
 
 /**
- * Remote sota Pi CLI Adapter (with Live JSON Event Streaming, Briefing Assembly, and Process Kill)
+ * Remote sota / Local Pi CLI Adapter (with Git Worktree Branch Isolation, Live JSON Event Streaming, and Process Kill)
  */
 export class SotaPiRunner {
   readonly engine: NocturnEngine;
@@ -52,19 +61,62 @@ export class SotaPiRunner {
 
   constructor(engine: NocturnEngine, options: SotaPiRunnerOptions = {}) {
     this.engine = engine;
+    const execMode =
+      options.execMode ??
+      ((process.env.NOCTURN_EXEC_MODE as "ssh" | "local" | undefined) ?? "ssh");
+    const defaultSock = process.env.HOME
+      ? `${process.env.HOME}/Documents/ChatGPT/multica/.multica/sota-ssh.sock`
+      : "";
     this.options = {
-      sshHost: options.sshHost ?? "root@115.190.90.101",
-      sshPort: options.sshPort ?? 10780,
+      execMode,
+      baseDir:
+        options.baseDir ??
+        process.env.NOCTURN_BASE_DIR ??
+        process.env.NOCTURN_SOTA_WORKDIR ??
+        (execMode === "local" ? process.cwd() : SOTA_BASE_DIR),
+      sshHost: options.sshHost ?? process.env.NOCTURN_SOTA_HOST ?? "root@115.190.90.101",
+      sshPort: options.sshPort ?? Number(process.env.NOCTURN_SOTA_PORT ?? 10780),
       sshControlSocket:
-        options.sshControlSocket ??
-        "/Users/yangxin/Documents/ChatGPT/multica/.multica/sota-ssh.sock",
+        options.sshControlSocket ?? process.env.NOCTURN_SOTA_SSH_SOCK ?? defaultSock,
       dryRun: options.dryRun ?? false,
       autoSpawnOnSota: options.autoSpawnOnSota ?? false,
     };
   }
 
   /**
-   * Build the exact SSH command that invokes `pi` on `sota` for a given Session & prompt.
+   * Build shell execution command & args for either `local` mode or `ssh` mode.
+   */
+  buildShellExec(shellCmd: string): { bin: string; args: string[] } {
+    if (this.options.execMode === "local") {
+      return { bin: "sh", args: ["-c", shellCmd] };
+    }
+    const sshArgs: string[] = ["-p", String(this.options.sshPort)];
+    if (this.options.sshControlSocket && existsSync(this.options.sshControlSocket)) {
+      sshArgs.push("-o", `ControlPath=${this.options.sshControlSocket}`);
+    }
+    sshArgs.push(this.options.sshHost, shellCmd);
+    return { bin: "ssh", args: sshArgs };
+  }
+
+  /**
+   * Ensure the task's worktree directory is initialized as an isolated Git branch (`nocturn/<slug>`).
+   */
+  buildGitWorktreeInitCmd(worktreePath: string): string {
+    return (
+      `mkdir -p ${worktreePath} && ` +
+      `if [ ! -e ${worktreePath}/.git ]; then ` +
+      `b="nocturn/$(basename ${worktreePath})"; ` +
+      `git -C ${worktreePath} init -b "$b" >/dev/null 2>&1 && ` +
+      `git -C ${worktreePath} config user.name "nocturn-agent" && ` +
+      `git -C ${worktreePath} config user.email "agent@nocturn.local" && ` +
+      `git -C ${worktreePath} add -A >/dev/null 2>&1 && ` +
+      `git -C ${worktreePath} commit --allow-empty -m "chore(worktree): init isolated branch $b" >/dev/null 2>&1 || true; ` +
+      `fi`
+    );
+  }
+
+  /**
+   * Build the exact command that invokes `pi` (on `sota` via SSH or locally) for a given Session & prompt.
    */
   buildSotaPiCommand(params: {
     worktreePath: string;
@@ -74,19 +126,19 @@ export class SotaPiRunner {
   }): { bin: string; args: string[]; model: string } {
     const model = params.model ?? LEADER_MODEL;
     const escapedPrompt = params.prompt.replace(/'/g, `'\\''`);
-    const envExport = `export HOME=${SOTA_BASE_DIR} PI_CODING_AGENT_DIR=${SOTA_BASE_DIR}/.pi/agent TMPDIR=${SOTA_BASE_DIR}/tmp PATH=${SOTA_BASE_DIR}/bin:$PATH`;
-    const remoteCmd = `${envExport} && mkdir -p ${params.worktreePath} ${SOTA_BASE_DIR}/sessions ${SOTA_BASE_DIR}/tmp && cd ${params.worktreePath} && ${SOTA_BASE_DIR}/bin/pi --mode json --session-dir ${SOTA_BASE_DIR}/sessions --model ${model} --session-id ${params.piSessionId} -p '${escapedPrompt}'`;
+    const baseDir = this.options.baseDir;
+    const piBin = this.options.execMode === "local" ? "pi" : `${baseDir}/bin/pi`;
+    const envExport =
+      this.options.execMode === "local"
+        ? `export PATH=${baseDir}/bin:$PATH`
+        : `export HOME=${baseDir} PI_CODING_AGENT_DIR=${baseDir}/.pi/agent TMPDIR=${baseDir}/tmp PATH=${baseDir}/bin:$PATH`;
+    const gitInit = this.buildGitWorktreeInitCmd(params.worktreePath);
+    const fullCmd = `${envExport} && mkdir -p ${baseDir}/sessions ${baseDir}/tmp && ${gitInit} && cd ${params.worktreePath} && ${piBin} --mode json --session-dir ${baseDir}/sessions --model ${model} --session-id ${params.piSessionId} -p '${escapedPrompt}'`;
 
+    const execSpec = this.buildShellExec(fullCmd);
     return {
-      bin: "ssh",
-      args: [
-        "-p",
-        String(this.options.sshPort),
-        "-o",
-        `ControlPath=${this.options.sshControlSocket}`,
-        this.options.sshHost,
-        remoteCmd,
-      ],
+      bin: execSpec.bin,
+      args: execSpec.args,
       model,
     };
   }
