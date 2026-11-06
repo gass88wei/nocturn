@@ -706,10 +706,114 @@
     let SQUAD_AGENTS = [
       { id: "dev-leader", name: "研发小队队长", role: "队长", isLeader: true, model: "gemini-4-argon-high", color: "#7c3aed", initials: "队长", dotClass: "" },
       { id: "pi-coder", name: "pi-coder", role: "编码组员", isLeader: false, model: "deepseek-v4.1-flash", color: "#2563eb", initials: "PI", dotClass: "blue" },
+      { id: "sec-sanitizer", name: "sec-sanitizer (动态招募)", role: "安全专家", isLeader: false, model: "deepseek-v4.1-flash", color: "#d97706", initials: "SEC", dotClass: "blue" },
       { id: "codex-reviewer", name: "codex-reviewer", role: "审查组员", isLeader: false, model: "zgca/deepseek-flash", color: "#10b981", initials: "审", dotClass: "green" }
     ];
 
     let tasksData = [
+      {
+        id: "task_452",
+        identifier: "TASK-452",
+        boundIssue: "nocturn#452",
+        title: "#452 动态招募安全专家 sec-sanitizer 实现 XSS 过滤模块 sanitize.js",
+        squadId: "dev",
+        status: "done",
+        runs: [
+          {
+            id: "r452_1",
+            agentId: "dev-leader",
+            status: "completed",
+            stageLabel: "① 队长动态孵化专家 Session",
+            shortSummary: "当场孵化新专家 @sec-sanitizer 并委派实现 sanitize.js",
+            fullReport: "已通过 nocturn dispatch --to sec-sanitizer 当场动态孵化专职安全专家 sec-sanitizer（无需人工预配），初始化隔离分支 nocturn/task-452 (aa4cfea) 并派发任务。",
+            steps: [
+              "初始化隔离 Git 分支: nocturn/task-452 (commit aa4cfea)",
+              "bash: nocturn dispatch --task TASK-452 --to sec-sanitizer --instructions '专职 Web 安全与 XSS 过滤专家'",
+              "自动孵化新 Agent: sec-sanitizer 加入 dev 小队",
+              "Stop after dispatching: 派单回合完成"
+            ]
+          },
+          {
+            id: "r452_2",
+            agentId: "sec-sanitizer",
+            status: "completed",
+            stageLabel: "② sec-sanitizer 初版实现 Session",
+            shortSummary: "提交初版 sanitize.js & 13 组测试 (commit 6d713aa)",
+            fullReport: "已交付初版 sanitize.js 与 sanitize.test.js（13 个测试组通过），提交到分支 nocturn/task-452 (commit 6d713aa) 并上报 state=ready。",
+            steps: [
+              "write: sanitize.js & sanitize.test.js",
+              "bash: node sanitize.test.js -> 13/13 passed",
+              "bash: git commit -m 'feat(TASK-452): deliver verified changes' (6d713aa)",
+              "bash: nocturn report --task TASK-452 --agent sec-sanitizer --state ready"
+            ]
+          },
+          {
+            id: "r452_3",
+            agentId: "codex-reviewer",
+            status: "completed",
+            stageLabel: "③ Reviewer 第1轮攻防审查 (打回 Rework)",
+            shortSummary: "构造 5 条 XSS 绕过探针攻破初版正则，自动打回 rework",
+            fullReport: "初版 13/13 单测虽过，但用 node 探针实测发现 3 类真实可绕过 XSS 缺陷：\n1) 斜杠分隔属性未清除：<img/onerror=alert(1) src=x>\n2) HTML 实体编码绕过 URL 协议检测：java&#115;cript:alert(1)、javascript&#58;alert(1)\n3) 空白控制符拆分协议名：java\\tscript:alert(1)\n已调用 nocturn report --state rework 自动打回给 sec-sanitizer 原会话！",
+            steps: [
+              "bash: node sanitize.test.js -> 13/13 pass",
+              "bash: 构造 5 条真实 XSS 绕过探针测试 -> 捕获 3 类高危绕过",
+              "bash: nocturn report --task TASK-452 --agent codex-reviewer --state rework"
+            ]
+          },
+          {
+            id: "r452_4",
+            agentId: "sec-sanitizer",
+            status: "completed",
+            stageLabel: "④ sec-sanitizer 第1轮返工 Session",
+            shortSummary: "恢复原会话 (445b4b38) 重写为标签 Tokenizer + 白名单 (commit b772902)",
+            fullReport: "恢复原会话修复全部 3 类绕过（commit b772902）：将全文正则重写为「逐个 start tag 重新 tokenize + URL 协议白名单 + 3 轮实体解码」，新增 7 组回归测试，20/20 测试组通过。",
+            steps: [
+              "恢复会话: --session-id 445b4b38-650b-443a-b2e7-62a802d76977",
+              "write: 重构 sanitize.js 为结构化标签解析 + URL 白名单",
+              "bash: node sanitize.test.js -> 20/20 test groups passed",
+              "bash: git commit b772902 & nocturn report --state ready"
+            ]
+          },
+          {
+            id: "r452_5",
+            agentId: "codex-reviewer",
+            status: "completed",
+            stageLabel: "⑤ Reviewer 第2轮攻防审查 (捕获 mXSS 再次打回)",
+            shortSummary: "构造变异型 mXSS 跨片段重组探针 (<scr<script>...ipt>) 再次打回",
+            fullReport: "复审确认上轮 3 类缺陷已修复，但进一步构造出变异型 XSS（mXSS）重组绕过：\n1) stripScriptTags('<scr<script>evil()</script>ipt>alert(1)</script>') 删掉内层后外层拼出完整可执行 <script>alert(1)</script>！\n2) 未闭合 '<img src=x onerror=alert(1)' 原样透传。\n要求改为不动点收敛循环 + 后置硬断言，再次打回 rework！",
+            steps: [
+              "bash: 构造嵌套重组探针 <scr<script>evil()</script>ipt> -> 捕获 mXSS 绕过",
+              "bash: nocturn report --task TASK-452 --agent codex-reviewer --state rework"
+            ]
+          },
+          {
+            id: "r452_6",
+            agentId: "sec-sanitizer",
+            status: "completed",
+            stageLabel: "⑥ sec-sanitizer 第2轮返工 Session",
+            shortSummary: "恢复原会话实现不动点收敛循环 + 幂等属性测试 (commit a14c287)",
+            fullReport: "恢复原会话 (445b4b38) 实现不动点收敛循环 + 硬后置兜底转义 + 未闭合标签转义（commit a14c287），新增 mXSS A1-A4 与全语料幂等性测试。",
+            steps: [
+              "恢复会话: --session-id 445b4b38-650b-443a-b2e7-62a802d76977",
+              "write: 实现 fixpoint 收敛循环与幂等校验",
+              "bash: git commit a14c287 & nocturn report --state ready"
+            ]
+          },
+          {
+            id: "r452_7",
+            agentId: "codex-reviewer",
+            status: "completed",
+            stageLabel: "⑦ Reviewer 终审通过与自动结单 (Auto-Done)",
+            shortSummary: "27/27 测试组 + 22 条 XSS/mXSS 攻击语料 0 失败 (commit 8dfef58)",
+            fullReport: "审查通过，准出自动结单（commit 8dfef58）：mXSS 重组与未闭合标签缺陷全部关闭，27/27 测试组全部通过，22 条攻击语料（重组 script/style、on* 分隔符、十进制/十六进制/命名实体/双重编码 scheme、tab/newline/NUL 拆分、srcdoc、未闭合标签）经活标签检测 + 幂等校验 0 failures。系统已自动结单 (Auto-Done)。",
+            steps: [
+              "bash: node sanitize.test.js -> 27/27 test groups passed",
+              "bash: 22 条攻击语料活标签检测 + 幂等校验 -> 0 failures",
+              "bash: git commit 8dfef58 & nocturn report --state ready --risk low (Auto-Done)"
+            ]
+          }
+        ]
+      },
       {
         id: "task_451",
         identifier: "TASK-451",
@@ -898,8 +1002,8 @@
       }
     ];
 
-    let selectedTaskId = "task_451";
-    let selectedRunIdx = 3; // 默认选中当前 Issue 的最后一棒 Session
+    let selectedTaskId = "task_452";
+    let selectedRunIdx = 6; // 默认选中当前 Issue 的最后一棒 Session
     let cachedWorktreeFiles = {};
     let activeFileByTask = {};
 
@@ -1096,7 +1200,14 @@
         const pathData = `M ${src.x} ${src.y} C ${src.x + span * 0.46} ${src.y}, ${dst.x - span * 0.46} ${dst.y}, ${dst.x} ${dst.y}`;
 
         const isSelected = idx === selectedRunIdx;
-        const color = agentId === "dev-leader" ? "#7c3aed" : (agentId === "pi-coder" ? "#2563eb" : "#10b981");
+        const color =
+          agentId === "dev-leader"
+            ? "#7c3aed"
+            : agentId === "pi-coder"
+            ? "#2563eb"
+            : agentId === "codex-reviewer"
+            ? "#10b981"
+            : "#d97706";
 
         if (isSelected) {
           const glow = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -1435,18 +1546,24 @@
           }
         });
       }
-      const stageNames = ["① 队长拆单 Session", "② pi-coder 编码实现 Session", "③ 队长转交审查 Session", "④ Reviewer 独立审查与结单 Session"];
       tasksData = snap.tasks.map(t => {
         const rawRuns = (snap.runs || []).filter(r => r.taskId === t.id);
-        const mappedRuns = rawRuns.map((r, idx) => ({
-          id: r.id,
-          agentId: r.agentId,
-          status: r.status,
-          stageLabel: stageNames[idx] || `第 ${idx + 1} 棒 · ${r.agentId} Session`,
-          shortSummary: r.verdict?.summary || r.summary,
-          fullReport: r.verdict?.summary || r.summary,
-          steps: (r.steps || []).map(st => st.text)
-        }));
+        const mappedRuns = rawRuns.map((r, idx) => {
+          let stageLabel = `第 ${idx + 1} 棒 · ${r.agentId} Session`;
+          if (idx === 0 && r.agentId === "dev-leader") stageLabel = "① 队长拆单与孵化专家 Session";
+          else if (idx === 1 && r.agentId !== "dev-leader" && r.agentId !== "codex-reviewer") stageLabel = `② ${r.agentId} 编码实现 Session`;
+          else if (r.agentId === "dev-leader") stageLabel = `③ 队长转交审查 Session`;
+          else if (r.agentId === "codex-reviewer") stageLabel = `④ Reviewer 独立审查与结单 Session`;
+          return {
+            id: r.id,
+            agentId: r.agentId,
+            status: r.status,
+            stageLabel,
+            shortSummary: r.verdict?.summary || r.summary,
+            fullReport: r.verdict?.summary || r.summary,
+            steps: (r.steps || []).map(st => st.text)
+          };
+        });
         return {
           id: t.id,
           identifier: t.identifier,

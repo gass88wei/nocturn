@@ -537,14 +537,23 @@ export class NocturnEngine {
 
       // Advance Task status & trigger Squad Leader Join Gate / Reviewer handoff / Autonomous Rework / Auto-Done
       if (params.state === "rework") {
-        // Reviewer found defects -> automatically route back to pi-coder's original Session without bothering human!
+        // Reviewer found defects -> automatically route back to the implementer's original Session without bothering human!
+        const priorImplRun = [...this.store.listAllRuns()]
+          .reverse()
+          .find(
+            (r) =>
+              r.taskId === task.id &&
+              r.agentId !== "codex-reviewer" &&
+              r.agentId !== task.leaderAgentId
+          );
+        const targetImplementer = priorImplRun?.agentId ?? "pi-coder";
         task.status = "in_progress";
-        task.assignedWorkerId = "pi-coder";
+        task.assignedWorkerId = targetImplementer;
         task.updatedAt = now;
         this.store.saveTask(task);
         this.sendInput({
           taskId: task.id,
-          targetAgentId: "pi-coder",
+          targetAgentId: targetImplementer,
           author: params.agentId,
           mode: "rework",
           text: `[审查自动打回 Rework] ${params.agentId} 发现问题要求返工：${params.summary}`,
@@ -557,19 +566,20 @@ export class NocturnEngine {
         const hasReviewerInSquad = this.store
           .listAgents()
           .some((a) => a.squadId === task.squadId && a.id === "codex-reviewer");
-        const isCoderSubmission =
+        const isImplementerSubmission =
           hasReviewerInSquad &&
-          params.agentId === "pi-coder" &&
+          params.agentId !== "codex-reviewer" &&
+          params.agentId !== task.leaderAgentId &&
           !task.parentTaskId;
 
-        if (isCoderSubmission) {
-          // Coder finished implementation -> wake Squad Leader to hand off to codex-reviewer!
+        if (isImplementerSubmission) {
+          // Implementer (pi-coder or dynamically spawned specialist) finished -> wake Squad Leader to hand off to codex-reviewer!
           task.status = "dispatching";
           this.store.enqueueEffect("wake_leader", `wake:${task.id}:coder_ready:${now}`, {
             taskId: task.id,
             leaderAgentId: task.leaderAgentId,
             autoSpawnLeader: true,
-            reason: `编码组员 ${params.agentId} 已完成代码编写并上报 Verdict=ready（${params.summary}）。请立即调用 nocturn dispatch --task ${task.identifier} --to codex-reviewer --order "请审查 ${task.identifier} 工作区下的代码与测试：若验证通过且无高风险变更，调用 nocturn report --task ${task.identifier} --agent codex-reviewer --state ready --risk low --summary '<审查结论>' 直接自动结单；若发现缺陷需要修改，调用 nocturn report --task ${task.identifier} --agent codex-reviewer --state rework --summary '<具体修改意见>' 自动打回给 pi-coder 返工；若涉及高风险架构/安全变更需人类确认，传 --risk high" 将任务转交给审查员 codex-reviewer！`,
+            reason: `执行专家 ${params.agentId} 已完成代码编写并上报 Verdict=ready（${params.summary}）。请立即调用 nocturn dispatch --task ${task.identifier} --to codex-reviewer --order "请审查 ${task.identifier} 工作区下的代码与测试：若验证通过且无高风险变更，调用 nocturn report --task ${task.identifier} --agent codex-reviewer --state ready --risk low --summary '<审查结论>' 直接自动结单；若发现缺陷需要修改，调用 nocturn report --task ${task.identifier} --agent codex-reviewer --state rework --summary '<具体修改意见>' 自动打回给 ${params.agentId} 返工；若涉及高风险架构/安全变更需人类确认，传 --risk high" 将任务转交给审查员 codex-reviewer！`,
           });
         } else {
           // Final Reviewer or standalone worker finished:
