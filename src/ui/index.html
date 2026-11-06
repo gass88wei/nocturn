@@ -938,25 +938,42 @@
       }
     ];
 
-    let selectedTaskId = "task_452";
+    let selectedTaskCode = "TASK-452";
     let selectedStepIdx = 7;
     let filterAgentId = null;
     let cachedWorktreeFiles = {};
     let activeFileByTask = {};
 
-    function fillPreset(text) {
+    function showBannerMessage(html, isWorking = false) {
+      const box = document.getElementById("bossLiveReply");
+      box.style.background = isWorking ? "#eef2ff" : "#f5f3ff";
+      box.style.borderColor = isWorking ? "#6366f1" : "#ddd6fe";
+      box.innerHTML = html;
+    }
+
+    function fillPreset(text, autoRun = false) {
       const inp = document.getElementById("mainCommandInput");
       inp.value = text;
       inp.focus();
+      if (autoRun) {
+        submitSuperAgentCommand();
+      }
     }
 
     // 核心入口：你在顶部大输入框给 SuperAgent 下命令 ➔ 它立即接令并往下建工单、造专家、写代码、红队验收！
     function submitSuperAgentCommand() {
       const inp = document.getElementById("mainCommandInput");
-      const cmdText = inp.value.trim();
-      if (!cmdText) { inp.focus(); return; }
+      let cmdText = inp.value.trim();
+      if (!cmdText) {
+        // 如果输入框为空直接点按钮，自动填入一条默认命令并立即执行，绝不没反应！
+        cmdText = "实现一个 debounce.js 防抖函数模块并通过红队边界审查";
+      }
 
-      const num = 450 + tasksData.length + 3;
+      const maxNum = tasksData.reduce((acc, t) => {
+        const m = String(t.identifier || "").match(/(\d+)/);
+        return m ? Math.max(acc, Number(m[1])) : acc;
+      }, 452);
+      const num = maxNum + 1;
       const newCode = "TASK-" + num;
       const newTask = {
         id: "task_" + Date.now(),
@@ -973,16 +990,23 @@
             status: "running",
             stageLabel: "① 总控队长接令 ➔ 正在往下拆单与调配专家",
             shortSummary: `已收到你的命令：「${cmdText}」，正在 sota 上切出分支 nocturn/${newCode.toLowerCase()} 并调度执行组员...`,
-            steps: [`初始化隔离 Git 分支 nocturn/${newCode.toLowerCase()}`]
+            steps: [
+              `[收到命令] ${cmdText}`,
+              `[初始化工作区] 正在 sota 上创建独立 Git 分支 nocturn/${newCode.toLowerCase()}...`
+            ]
           }
         ]
       };
       tasksData.unshift(newTask);
+      selectedTaskCode = newCode;
+      selectedStepIdx = 0;
       inp.value = "";
-      document.getElementById("bossLiveReply").innerHTML = `
-        <span><strong>🤖 总控最新汇报：</strong>已收到你的命令！「${cmdText}」 ➔ 已为你生成工单 <code>${newCode}</code>，正在唤醒总控队长往下调配专家并在 <code>sota</code> 独立 Git 分支上执行...</span>
-      `;
-      selectTask(newTask.id);
+
+      showBannerMessage(
+        `<span><strong>🚀 正在往下执行 (${newCode})：</strong>已收到命令「${cmdText}」 ➔ 已在下方新增工单 <code>${newCode}</code>，正在唤醒 <code>sota</code> 总控队长拆单派发...</span>`,
+        true
+      );
+      syncUI();
 
       fetch(`${API_BASE}/api/tasks`, {
         method: "POST",
@@ -1000,11 +1024,14 @@
       if (e.key === "Enter") submitSuperAgentCommand();
     });
 
-    function selectTask(taskId) {
-      selectedTaskId = taskId;
-      const t = tasksData.find(x => x.id === taskId) || tasksData[0];
+    function selectTask(taskCodeOrId) {
+      const t =
+        tasksData.find(x => x.identifier === taskCodeOrId || x.id === taskCodeOrId) ||
+        tasksData[0];
+      if (!t) return;
+      selectedTaskCode = t.identifier;
       selectedStepIdx = Math.max(0, (t.runs || []).length - 1);
-      if (t && !cachedWorktreeFiles[t.identifier]) {
+      if (!cachedWorktreeFiles[t.identifier]) {
         fetchWorktreeFiles(t.identifier);
       }
       syncUI();
@@ -1021,7 +1048,7 @@
       if (filterAgentId) {
         const matched = tasksData.find(t => (t.runs || []).some(r => r.agentId === filterAgentId));
         if (matched) {
-          selectedTaskId = matched.id;
+          selectedTaskCode = matched.identifier;
           const runIdx = (matched.runs || []).findIndex(r => r.agentId === filterAgentId);
           if (runIdx >= 0) selectedStepIdx = runIdx;
         }
@@ -1080,7 +1107,7 @@
         : tasksData;
 
       rightCol.innerHTML = visibleTasks.map(t => {
-        const isSel = t.id === selectedTaskId;
+        const isSel = t.identifier === selectedTaskCode;
         const stClass = t.status === "done" ? "done" : (t.status === "in_review" ? "review" : "running");
         const stLabel = t.status === "done" ? "✅ 已自动结单" : (t.status === "in_review" ? "⚠️ 待拍板" : "🟢 正在往下执行");
         const wtInfo = cachedWorktreeFiles[t.identifier];
@@ -1091,8 +1118,8 @@
 
         return `
           <div class="task-node-card ${isSel ? 'selected-task' : ''}"
-               data-task-id="${t.id}"
-               onclick="selectTask('${t.id}')">
+               data-task-code="${t.identifier}"
+               onclick="selectTask('${t.identifier}')">
             <div class="task-card-top">
               <div style="display:flex;align-items:center;gap:6px;">
                 <span class="task-code">${t.identifier}</span>
@@ -1140,11 +1167,11 @@
       svgEl.innerHTML = "";
 
       rightCol.querySelectorAll(".task-node-card").forEach(cardEl => {
-        const taskId = cardEl.dataset.taskId;
-        const task = tasksData.find(x => x.id === taskId);
+        const taskCode = cardEl.dataset.taskCode;
+        const task = tasksData.find(x => x.identifier === taskCode);
         if (!task) return;
         const r = cardEl.getBoundingClientRect();
-        const isSelectedTask = taskId === selectedTaskId;
+        const isSelectedTask = taskCode === selectedTaskCode;
         const isRunningTask = task.status !== "done";
 
         const participantIds = [...new Set((task.runs || []).map(run => run.agentId))];
@@ -1189,7 +1216,7 @@
     }
 
     function renderInspectorDrawer() {
-      const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
+      const t = tasksData.find(x => x.identifier === selectedTaskCode) || tasksData[0];
       if (!t) return;
       const runs = t.runs || [];
       const curRun = runs[selectedStepIdx] || runs[runs.length - 1] || { agentId: "dev-leader", stageLabel: "初始化", steps: [] };
@@ -1203,7 +1230,7 @@
             <span class="task-code">${t.identifier}</span>
             <span class="task-branch-tag">🌿 ${gitBranch}${gitCommit}</span>
           </div>
-          <button class="pill-btn" onclick="triggerTargetedRework('${t.id}')">↩️ 整单驳回重做</button>
+          <button class="pill-btn" onclick="triggerTargetedRework('${t.identifier}')">↩️ 整单驳回重做</button>
         </div>
         <h2 class="inspector-title">${t.title}</h2>
       `;
@@ -1269,25 +1296,23 @@
       renderInspectorDrawer();
     }
 
+    // 不使用 window.prompt（避免被 Canvas iframe 沙盒拦截），直接在底部输入框填入重做指令并触发或聚焦！
     function promptRedoFromStep(stepIdx) {
       selectedStepIdx = stepIdx;
-      const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
+      const t = tasksData.find(x => x.identifier === selectedTaskCode) || tasksData[0];
       if (!t) return;
       const curRun = (t.runs || [])[stepIdx] || { agentId: "pi-coder", stageLabel: "当前步骤" };
-      const instruction = prompt(
-        `【从「${curRun.stageLabel}」重做】\n请输入给 @${curRun.agentId} 的修改/重做指令（将在 sota 上恢复其原会话执行，并自动触发后续队长转审与 Reviewer 复核）：`,
-        "请补充边界条件测试并重新验证交付"
-      );
-      if (!instruction) return;
-      document.getElementById("composerInput").value = instruction;
+      const inp = document.getElementById("composerInput");
+      if (!inp.value.trim()) {
+        inp.value = `从「${curRun.stageLabel}」重做：请补充边界测试并重新验证交付`;
+      }
       document.getElementById("sendSteerBtn").click();
     }
 
-    function triggerTargetedRework(taskId) {
-      const t = tasksData.find(x => x.id === taskId);
+    function triggerTargetedRework(taskCode) {
+      const t = tasksData.find(x => x.identifier === taskCode) || tasksData[0];
       if (!t) return;
-      const reason = prompt(`请输入对 ${t.identifier} 的驳回返工要求：`, "请增加一组异常输入测试并重新提交审查");
-      if (!reason) return;
+      const reason = document.getElementById("composerInput").value.trim() || "请增加一组异常输入边界测试并重新提交红队审查";
       t.status = "in_progress";
       const impl = t.implementerId || "pi-coder";
       t.runs.push({
@@ -1295,10 +1320,14 @@
         agentId: impl,
         status: "running",
         stageLabel: `第 ${t.runs.length + 1} 步 · ${impl} 返工修复`,
-        shortSummary: `收到返工要求：「${reason}」`,
-        steps: [`↩️ 人工驳回返工：${reason}`]
+        shortSummary: `收到返工要求：「${reason}」，正在 sota 上恢复原会话执行...`,
+        steps: [`↩️ 触发返工：${reason}`]
       });
       selectedStepIdx = t.runs.length - 1;
+      showBannerMessage(
+        `<span><strong>↩️ 已触发返工 (${t.identifier})：</strong>正在唤醒 <code>@${impl}</code> 原会话按要求重做：「${reason}」</span>`,
+        true
+      );
       fetch(`${API_BASE}/api/rework`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1309,13 +1338,18 @@
 
     document.getElementById("sendSteerBtn").addEventListener("click", () => {
       const inp = document.getElementById("composerInput");
-      const val = inp.value.trim();
-      if (!val) return;
-      const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
+      const val = inp.value.trim() || "请检查当前代码边界条件并重新汇报状态";
+      const t = tasksData.find(x => x.identifier === selectedTaskCode) || tasksData[0];
       if (!t) return;
       const curRun = (t.runs || [])[selectedStepIdx] || { agentId: "pi-coder", steps: [] };
+      curRun.steps = curRun.steps || [];
       curRun.steps.push(`⚡ 你向 ${curRun.agentId} 介入: ${val}`);
+      t.status = "in_progress";
       inp.value = "";
+      showBannerMessage(
+        `<span><strong>⚡ 已向 @${curRun.agentId} (${t.identifier}) 发送单步介入：</strong>「${val}」 ➔ 正在 <code>sota</code> 上恢复其原生会话执行...</span>`,
+        true
+      );
       syncUI();
 
       fetch(`${API_BASE}/api/sota/exec`, {
@@ -1349,7 +1383,9 @@
         });
       }
 
-      tasksData = snap.tasks.map(t => {
+      // 按最新创建的任务排在最上面（reverse）
+      const orderedTasks = snap.tasks.slice().reverse();
+      tasksData = orderedTasks.map(t => {
         const rawRuns = (snap.runs || []).filter(r => r.taskId === t.id);
         const implRun = rawRuns.find(r => r.agentId !== "dev-leader" && r.agentId !== "codex-reviewer");
         const mappedRuns = rawRuns.map((r, idx) => {
@@ -1382,20 +1418,17 @@
         };
       });
 
-      const latestTask = tasksData[0];
-      if (latestTask) {
-        const latestVerdictText = latestTask.runs?.[latestTask.runs.length - 1]?.shortSummary || "正在往下调度执行中...";
-        document.getElementById("bossLiveReply").innerHTML = `
-          <span><strong>🤖 总控最新汇报 (${latestTask.identifier})：</strong>${latestVerdictText.slice(0, 140)}</span>
-        `;
-      }
-
-      const cur = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
+      const cur = tasksData.find(x => x.identifier === selectedTaskCode) || tasksData[0];
       if (cur) {
-        selectedTaskId = cur.id;
+        selectedTaskCode = cur.identifier;
         if (selectedStepIdx >= (cur.runs || []).length) {
           selectedStepIdx = Math.max(0, (cur.runs || []).length - 1);
         }
+        const latestVerdictText = cur.runs?.[cur.runs.length - 1]?.shortSummary || "正在往下调度执行中...";
+        showBannerMessage(
+          `<span><strong>🤖 总控实时汇报 (${cur.identifier} · ${cur.status === 'done' ? '已结单' : '执行中'})：</strong>${latestVerdictText.slice(0, 150)}</span>`,
+          cur.status !== "done"
+        );
         if (!cachedWorktreeFiles[cur.identifier]) {
           fetchWorktreeFiles(cur.identifier);
         }
@@ -1413,7 +1446,7 @@
     } catch {}
 
     window.addEventListener("resize", () => requestAnimationFrame(drawGlobalCurves));
-    selectTask(selectedTaskId);
+    selectTask(selectedTaskCode);
   </script>
 </body>
 </html>
