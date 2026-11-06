@@ -818,9 +818,9 @@
             agentId: "codex-reviewer",
             status: "completed",
             stageLabel: "⑥ Reviewer 第2轮红队审查 ➔ 捕获变异型 mXSS 再次打回",
-            shortSummary: "构造跨片段重组探针 <scr<script>evil()</script>ipt> 复现出活标签，再次打回 rework",
+            shortSummary: "构造跨片段重组探针 <scr<script>evil()<\\/script>ipt> 复现出活标签，再次打回 rework",
             steps: [
-              "bash: 构造嵌套重组探针 <scr<script>evil()</script>ipt> -> 捕获 mXSS 重组漏洞",
+              "bash: 构造嵌套重组探针 <scr<script>evil()<\\/script>ipt> -> 捕获 mXSS 重组漏洞",
               "bash: nocturn report --task TASK-452 --agent codex-reviewer --state rework"
             ]
           },
@@ -944,6 +944,14 @@
     let cachedWorktreeFiles = {};
     let activeFileByTask = {};
 
+    function esc(s) {
+      return String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
     function showBannerMessage(html, isWorking = false) {
       const box = document.getElementById("bossLiveReply");
       box.style.background = isWorking ? "#eef2ff" : "#f5f3ff";
@@ -1003,7 +1011,7 @@
       inp.value = "";
 
       showBannerMessage(
-        `<span><strong>🚀 正在往下执行 (${newCode})：</strong>已收到命令「${cmdText}」 ➔ 已在下方新增工单 <code>${newCode}</code>，正在唤醒 <code>sota</code> 总控队长拆单派发...</span>`,
+        `<span><strong>🚀 正在往下执行 (${esc(newCode)})：</strong>已收到命令「${esc(cmdText)}」 ➔ 已在下方新增工单 <code>${esc(newCode)}</code>，正在唤醒 <code>sota</code> 总控队长拆单派发...</span>`,
         true
       );
       syncUI();
@@ -1127,12 +1135,12 @@
               </div>
               <span class="task-status-pill ${stClass}">${stLabel}</span>
             </div>
-            <div class="task-card-title">${t.title}</div>
+            <div class="task-card-title">${esc(t.title)}</div>
             <div class="task-relay-track">
               <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
                 <span class="mini-relay-chip leader">① 总控派单</span>
                 <span>➔</span>
-                <span class="mini-relay-chip ${isSpec ? 'spec' : 'coder'}">② ${implId}${isSpec ? ' (动态造人)' : ''}</span>
+                <span class="mini-relay-chip ${isSpec ? 'spec' : 'coder'}">② ${esc(implId)}${isSpec ? ' (动态造人)' : ''}</span>
                 <span>⇄</span>
                 <span class="mini-relay-chip rev">③ Reviewer${reworkCount > 0 ? ` (${reworkCount}轮打回修复)` : ''}</span>
               </div>
@@ -1227,12 +1235,12 @@
       document.getElementById("inspectorHeader").innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <div style="display:flex;align-items:center;gap:6px;">
-            <span class="task-code">${t.identifier}</span>
-            <span class="task-branch-tag">🌿 ${gitBranch}${gitCommit}</span>
+            <span class="task-code">${esc(t.identifier)}</span>
+            <span class="task-branch-tag">🌿 ${esc(gitBranch)}${esc(gitCommit)}</span>
           </div>
-          <button class="pill-btn" onclick="triggerTargetedRework('${t.identifier}')">↩️ 整单驳回重做</button>
+          <button class="pill-btn" onclick="triggerTargetedRework('${esc(t.identifier)}')">↩️ 整单驳回重做</button>
         </div>
-        <h2 class="inspector-title">${t.title}</h2>
+        <h2 class="inspector-title">${esc(t.title)}</h2>
       `;
 
       document.getElementById("timelineStepsList").innerHTML = runs.map((r, idx) => {
@@ -1244,13 +1252,13 @@
             <div class="step-card-header">
               <div class="step-stage-title">
                 <span style="width:8px;height:8px;border-radius:50%;background:${agentObj.color};display:inline-block;"></span>
-                <span>${r.stageLabel || `第 ${idx + 1} 步 · ${r.agentId}`}</span>
+                <span>${esc(r.stageLabel || `第 ${idx + 1} 步 · ${r.agentId}`)}</span>
               </div>
               <button class="redo-step-btn" onclick="event.stopPropagation();promptRedoFromStep(${idx})">↻ 从此步重做</button>
             </div>
-            <div class="step-summary-text">${r.shortSummary || ''}</div>
+            <div class="step-summary-text">${esc(r.shortSummary || '')}</div>
             <div class="step-raw-logs">
-              ${cleanLogs.map(st => `<div>• ${String(st)}</div>`).join("") || '<div>正在 sota 上执行...</div>'}
+              ${cleanLogs.map(st => `<div>• ${esc(st)}</div>`).join("") || '<div>正在 sota 上执行...</div>'}
             </div>
           </div>
         `;
@@ -1426,7 +1434,7 @@
         }
         const latestVerdictText = cur.runs?.[cur.runs.length - 1]?.shortSummary || "正在往下调度执行中...";
         showBannerMessage(
-          `<span><strong>🤖 总控实时汇报 (${cur.identifier} · ${cur.status === 'done' ? '已结单' : '执行中'})：</strong>${latestVerdictText.slice(0, 150)}</span>`,
+          `<span><strong>🤖 总控实时汇报 (${esc(cur.identifier)} · ${cur.status === 'done' ? '已结单' : '执行中'})：</strong>${esc(latestVerdictText.slice(0, 150))}</span>`,
           cur.status !== "done"
         );
         if (!cachedWorktreeFiles[cur.identifier]) {
