@@ -3,26 +3,20 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Nocturn — 按 Issue 隔离的多智能体连线与介入工作台</title>
+  <title>Nocturn SuperAgent — 给命令即往下自动拆单、造人、编码与红队验收</title>
   <style>
     :root {
       color-scheme: light;
-      --bg-app: #f6f7f9;
-      --bg-main: #ffffff;
-      --bg-sidebar: #f6f7f9;
-      --bg-hover: #eef0f4;
-      --bg-active: #dfe6ff;
-      --text-primary: #1f2329;
-      --text-secondary: #646a73;
-      --text-muted: #8f959e;
-      --border-subtle: #ebedf0;
-      --border-card: #e5e7eb;
-      --border-pill: #e2e5ec;
-      --blue-line: #2563eb;
-      --purple-line: #7c3aed;
-      --green-line: #10b981;
-      --gray-line: #64748b;
-      --green-online: #22c55e;
+      --bg-app: #f3f5f9;
+      --bg-card: #ffffff;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --border-subtle: #e2e8f0;
+      --purple-boss: #6d28d9;
+      --blue-coder: #2563eb;
+      --amber-spec: #d97706;
+      --green-rev: #059669;
 
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Inter", sans-serif;
       color: var(--text-primary);
@@ -39,260 +33,232 @@
       overflow: hidden;
     }
 
-    .workspace-frame {
+    .app-layout {
       display: grid;
-      grid-template-columns: 236px minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) 440px;
       height: 100vh;
-      background: var(--bg-app);
-    }
-
-    /* ============================================================================
-       1. 左侧栏：按 Issue 物理隔离的导航栏（每个 Issue 是一个独立沙盒，不同 Issue 绝不串线！）
-       ============================================================================ */
-    .issue-sidebar {
-      background: var(--bg-sidebar);
-      padding: 14px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      border-right: 1px solid var(--border-subtle);
-      user-select: none;
-      overflow-y: auto;
-    }
-    .sidebar-brand {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 4px 2px;
-    }
-    .brand-left {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 16px;
-      font-weight: 700;
-      color: #111827;
-    }
-    .brand-logo {
-      width: 26px;
-      height: 26px;
-      border-radius: 8px;
-      background: #1e1b4b;
-      color: #fff;
-      font-size: 12.5px;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
-    .brand-logo::after {
-      content: "";
-      position: absolute;
-      top: -2px;
-      right: -2px;
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #22c55e;
-      border: 1.5px solid var(--bg-sidebar);
-    }
-
-    .new-issue-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      background: #4f46e5;
-      color: #ffffff;
-      border: none;
-      border-radius: 9px;
-      padding: 8px 10px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      box-shadow: 0 1px 3px rgba(79, 70, 229, 0.25);
-    }
-    .new-issue-btn:hover { background: #4338ca; }
-
-    .sidebar-section-title {
-      font-size: 10.5px;
-      font-weight: 700;
-      color: #8f959e;
-      padding: 6px 4px 2px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .issue-nav-list {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .issue-nav-card {
-      padding: 8px 9px;
-      border-radius: 10px;
-      cursor: pointer;
-      border: 1px solid transparent;
-      background: transparent;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      transition: all 0.12s;
-    }
-    .issue-nav-card:hover { background: #e8ebf0; }
-    .issue-nav-card.active {
-      background: var(--bg-active);
-      border-color: #c7d2fe;
-    }
-    .issue-nav-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-    }
-    .issue-nav-code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 10.5px;
-      font-weight: 700;
-      color: #4f46e5;
-    }
-    .issue-nav-status {
-      font-size: 9.5px;
-      font-weight: 700;
-      padding: 1px 5px;
-      border-radius: 4px;
-    }
-    .issue-nav-status.running { background: #dbeafe; color: #1d4ed8; }
-    .issue-nav-status.review { background: #fef3c7; color: #b45309; }
-    .issue-nav-status.done { background: #d1fae5; color: #047857; }
-    .issue-nav-title {
-      font-size: 12px;
-      font-weight: 600;
-      color: #1f2329;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .issue-nav-meta {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 10px;
-      color: #64748b;
-    }
-
-    /* ============================================================================
-       2. 主工作台：当前选中 Issue 的专属连线舞台（左半屏） + 当前选中回合/Agent 的 Session 抽屉（右半屏）
-       ============================================================================ */
-    .main-surface {
-      background: var(--bg-main);
-      margin: 6px 6px 6px 0;
-      border-radius: 16px;
-      border: 1px solid var(--border-subtle);
-      display: flex;
-      min-width: 0;
-      height: calc(100vh - 12px);
+      width: 100vw;
       overflow: hidden;
     }
 
-    .issue-stage-pane {
-      flex: 1;
-      min-width: 0;
-      padding: 16px 20px 24px;
+    /* ============================================================================
+       左主屏（自上而下）：
+       第 1 层（最醒目）：你 ➔ SuperAgent 总控主命令台（进来第一眼就知道在这里直接给命令！）
+       第 2 层（往下做）：SuperAgent 往下派出的「执行团队 ⇄ 任务工单」实时连线拓扑
+       ============================================================================ */
+    .main-command-stage {
+      padding: 16px 22px 20px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 14px;
     }
 
-    /* 当前 Issue 顶部信息栏 */
-    .issue-header-card {
-      background: #f8fafc;
+    /* 第 1 层：SuperAgent 总控主命令中心（Big Hero Command Center） */
+    .superagent-hero-card {
+      background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+      border: 2px solid #6366f1;
+      border-radius: 16px;
+      padding: 16px 18px;
+      box-shadow: 0 8px 24px rgba(79, 70, 229, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .hero-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .hero-agent-identity {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .boss-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: #fff;
+      font-weight: 800;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+    }
+    .boss-title {
+      font-size: 15.5px;
+      font-weight: 800;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .boss-sub {
+      font-size: 12px;
+      color: #475569;
+      margin-top: 1px;
+    }
+    .sota-online-badge {
+      font-size: 11px;
+      font-weight: 700;
+      color: #047857;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    /* 主命令大输入框：进来第一眼就能看到、直接敲命令回车 */
+    .command-input-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 8px 10px 8px 14px;
+      transition: all 0.15s;
+    }
+    .command-input-box:focus-within {
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+    }
+    .command-input-field {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 14px;
+      font-weight: 500;
+      color: #0f172a;
+      background: transparent;
+    }
+    .command-input-field::placeholder {
+      color: #94a3b8;
+      font-weight: 400;
+    }
+    .command-submit-btn {
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      color: #ffffff;
+      border: none;
+      border-radius: 9px;
+      padding: 9px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+    }
+    .command-submit-btn:hover { opacity: 0.95; }
+
+    /* 快捷命令示例与总控最新回执 */
+    .hero-bottom-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .quick-presets {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: #64748b;
+    }
+    .preset-chip {
+      background: #f1f5f9;
       border: 1px solid #e2e8f0;
-      border-radius: 14px;
-      padding: 12px 16px;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 11px;
+      color: #334155;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .preset-chip:hover {
+      background: #e0e7ff;
+      border-color: #a5b4fc;
+      color: #3730a3;
+    }
+
+    /* 总控实时回执条（显示总控收到你的命令后是怎么往下拆单、造人、派活的） */
+    .boss-live-reply {
+      background: #f5f3ff;
+      border: 1px solid #ddd6fe;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #4c1d95;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    /* 连接第 1 层（总控命令台）与第 2 层（往下派发的执行网络）的视觉向下箭头 */
+    .downward-connector {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #4f46e5;
+      margin: -4px 0;
+      user-select: none;
+    }
+    .downward-badge {
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      padding: 3px 12px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ============================================================================
+       第 2 层（往下干活层）：左「总控麾下的执行团队（含动态造出的新专家）」 ⇄ 右「往下派出的工单 Tickets」
+       ============================================================================ */
+    .downward-execution-card {
+      flex: 1;
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .exec-card-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
       flex-wrap: wrap;
-    }
-    .issue-header-left {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-width: 0;
-    }
-    .issue-header-badges {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-    .issue-title-main {
-      font-size: 16px;
-      font-weight: 700;
-      color: #111827;
-      margin: 0;
-    }
-    .worktree-badge {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 10.5px;
-      color: #475569;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      padding: 2px 7px;
-      border-radius: 5px;
-    }
-    .issue-bind-chip {
-      font-size: 10.5px;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 5px;
-      border: 1px solid #c7d2fe;
-      color: #4338ca;
-      background: #eef2ff;
-      cursor: pointer;
-    }
-
-    /* ============================================================================
-       核心设计：按当前 Issue 隔离的「小队智能体 ⇄ 本 Issue 回合 Session」二部图连线卡
-       （左边是参与本 Issue 的智能体，右边是本 Issue 经历的第 1..4 棒 Session 胶囊，点谁就在右边展开谁！）
-       ============================================================================ */
-    .now-card {
-      background: #ffffff;
-      border: 1px solid var(--border-card);
-      border-radius: 16px;
-      padding: 16px 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-    .now-card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 8px;
     }
     .legend-bar {
       display: flex;
       align-items: center;
       gap: 12px;
       font-size: 11px;
-      color: #646a73;
+      color: #64748b;
     }
     .legend-tag { display: inline-flex; align-items: center; gap: 5px; }
 
     .bipartite-stage {
       position: relative;
       display: grid;
-      grid-template-columns: 194px minmax(64px, 15%) minmax(220px, 1fr);
-      min-height: 250px;
-      align-items: center;
+      grid-template-columns: 226px minmax(75px, 15%) minmax(280px, 1fr);
+      align-items: start;
+      min-height: 410px;
     }
+
     .left-column {
       grid-column: 1;
       display: flex;
@@ -301,238 +267,328 @@
       z-index: 2;
     }
     .squad-pod {
-      background: #f8f9fb;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      padding: 8px 9px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 13px;
+      padding: 10px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 7px;
     }
     .squad-pod-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding-bottom: 5px;
-      border-bottom: 1px dashed #e2e5ec;
-      font-size: 11px;
+      padding-bottom: 6px;
+      border-bottom: 1px dashed #cbd5e1;
+      font-size: 11.5px;
       font-weight: 700;
-      color: #374151;
+      color: #1e293b;
     }
     .actor-node {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 5px 6px;
-      border-radius: 8px;
+      padding: 7px 8px;
+      border-radius: 10px;
       cursor: pointer;
-      border: 1px solid transparent;
-      transition: all 0.12s;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      transition: all 0.14s;
     }
-    .actor-node:hover { background: #eef0f4; }
-    .actor-node.selected-actor {
-      background: #dfe6ff;
-      border-color: #818cf8;
+    .actor-node:hover { border-color: #94a3b8; }
+    .actor-node.active-filter {
+      background: #eef2ff;
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15);
     }
-    .actor-node.worker-indent { padding-left: 10px; position: relative; }
+    .actor-node.worker-indent {
+      margin-left: 10px;
+      position: relative;
+    }
     .actor-node.worker-indent::before {
-      content: ""; position: absolute; left: 3px; top: -4px; bottom: 50%;
-      width: 4px; border-left: 1.5px solid #d1d5db; border-bottom: 1.5px solid #d1d5db;
+      content: "";
+      position: absolute;
+      left: -7px;
+      top: -6px;
+      bottom: 50%;
+      width: 6px;
+      border-left: 1.5px solid #cbd5e1;
+      border-bottom: 1.5px solid #cbd5e1;
     }
-    .actor-left { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .actor-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
     .actor-avatar {
-      width: 26px; height: 26px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 9.5px; font-weight: 700; color: #fff; flex-shrink: 0;
+      width: 27px;
+      height: 27px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
     }
-    .actor-name { font-size: 11.5px; font-weight: 600; color: #1f2329; white-space: nowrap; }
-    .actor-sub { font-size: 9.5px; color: #8f959e; white-space: nowrap; }
-    .origin-dot {
-      width: 6.5px; height: 6.5px; border-radius: 50%;
-      background: var(--purple-line); flex-shrink: 0;
+    .actor-name {
+      font-size: 12px;
+      font-weight: 700;
+      color: #111827;
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
-    .origin-dot.blue { background: var(--blue-line); }
-    .origin-dot.green { background: var(--green-line); }
+    .actor-badge-dyn {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 0 4px;
+      border-radius: 4px;
+      background: #fef3c7;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+    .actor-sub { font-size: 10px; color: #64748b; }
+    .origin-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
-    /* 右列：本 Issue 内部按时间顺序排列的各个 Run / Session 胶囊（点击任意一棒，右侧直接展开该棒的 Session 详情！） */
+    /* 右列：总控往下派出的各个任务工单 (Tickets) */
     .right-column {
       grid-column: 3;
       display: flex;
       flex-direction: column;
-      gap: 9px;
+      gap: 10px;
       z-index: 2;
       min-width: 0;
     }
-    .run-pill {
-      min-height: 42px;
+    .task-node-card {
       background: #ffffff;
-      border: 1px solid var(--border-pill);
-      border-radius: 10px;
-      padding: 6px 11px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 10px 13px;
+      cursor: pointer;
+      transition: all 0.14s;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .task-node-card:hover { border-color: #94a3b8; }
+    .task-node-card.selected-task {
+      border-color: #4f46e5;
+      background: #f8faff;
+      box-shadow: 0 2px 10px rgba(79, 70, 229, 0.12);
+    }
+    .task-card-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      cursor: pointer;
-      transition: all 0.12s;
     }
-    .run-pill:hover { border-color: #6366f1; }
-    .run-pill.selected-pill {
-      border-color: #4f46e5;
-      background: #f5f7ff;
-      box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15);
+    .task-code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: #4f46e5;
+      background: #eef2ff;
+      padding: 1px 6px;
+      border-radius: 5px;
     }
-    .run-pill-left {
+    .task-branch-tag {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      color: #047857;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      padding: 1px 6px;
+      border-radius: 5px;
+    }
+    .task-status-pill {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+    .task-status-pill.running { background: #dbeafe; color: #1d4ed8; }
+    .task-status-pill.review { background: #fef3c7; color: #b45309; }
+    .task-status-pill.done { background: #d1fae5; color: #047857; }
+    .task-card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #111827;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .task-relay-track {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding-top: 4px;
+      border-top: 1px dashed #e2e8f0;
+      font-size: 10.5px;
+      color: #64748b;
+    }
+    .mini-relay-chip {
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      background: #f1f5f9;
+      color: #334155;
+    }
+    .mini-relay-chip.leader { background: #f3e8ff; color: #6d28d9; }
+    .mini-relay-chip.coder { background: #dbeafe; color: #1d4ed8; }
+    .mini-relay-chip.spec { background: #fef3c7; color: #b45309; }
+    .mini-relay-chip.rev { background: #d1fae5; color: #047857; }
+
+    .curves-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ============================================================================
+       右半屏：选中工单的「往下执行全过程（队长拆单/造人 ➔ 编码 ⇄ 红队返工）+ 交付源码 + 单步插话/重做」
+       ============================================================================ */
+    .task-inspector-drawer {
+      background: #ffffff;
+      border-left: 1px solid var(--border-subtle);
       display: flex;
       flex-direction: column;
-      gap: 2px;
-      min-width: 0;
-      flex: 1;
+      height: 100%;
+      overflow: hidden;
     }
-    .run-pill-stage {
-      font-size: 11px;
+    .inspector-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .inspector-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #111827;
+      margin: 0;
+    }
+    .inspector-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .section-label {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .timeline-step-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 9px 11px;
+      background: #ffffff;
+      cursor: pointer;
+      transition: all 0.12s;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .timeline-step-card:hover { border-color: #94a3b8; }
+    .timeline-step-card.active-step {
+      border-color: #4f46e5;
+      background: #f5f7ff;
+      box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.12);
+    }
+    .step-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .step-stage-title {
+      font-size: 11.5px;
       font-weight: 700;
       color: #111827;
       display: flex;
       align-items: center;
       gap: 6px;
     }
-    .run-pill-summary {
-      font-size: 10.5px;
-      color: #64748b;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    .redo-step-btn {
+      font-size: 10px;
+      font-weight: 600;
+      color: #b45309;
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-radius: 5px;
+      padding: 1.5px 6px;
+      cursor: pointer;
     }
-    .run-pill-badge {
-      font-size: 9.5px;
-      font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 4px;
-      flex-shrink: 0;
+    .step-summary-text {
+      font-size: 11px;
+      color: #475569;
+      line-height: 1.45;
+      white-space: pre-wrap;
     }
-    .run-pill-badge.done { background: #d1fae5; color: #047857; }
-    .run-pill-badge.running { background: #dbeafe; color: #1d4ed8; }
-
-    .curves-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
-
-    /* 本 Issue 的交付物与 sota 源码卡片 */
-    .deliverables-card {
-      background: #ffffff;
-      border: 1px solid var(--border-card);
-      border-radius: 14px;
-      padding: 14px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .file-pills-row { display: flex; flex-wrap: wrap; gap: 6px; }
-    .file-pill {
-      font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 6px;
-      border: 1px solid #cbd5e1; background: #f8fafc; color: #1e293b;
-      cursor: pointer; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    }
-    .file-pill:hover { border-color: #6366f1; }
-    .file-pill.active { background: #1e1b4b; color: #fff; border-color: #1e1b4b; }
-    .code-viewer-box {
-      background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 10px;
+    .step-raw-logs {
+      margin-top: 4px;
+      padding: 6px 8px;
+      background: #0f172a;
+      color: #cbd5e1;
+      border-radius: 6px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 11px; line-height: 1.45; max-height: 230px; overflow: auto; white-space: pre;
+      font-size: 10px;
+      line-height: 1.4;
+      display: none;
+      flex-direction: column;
+      gap: 3px;
     }
+    .timeline-step-card.active-step .step-raw-logs { display: flex; }
 
-    /* ============================================================================
-       3. 右侧伴随式 Session 抽屉：展示当前在连线图里点中的那一棒 Session 详情 + 直接向它插话介入！
-       ============================================================================ */
-    .session-peek-drawer {
-      width: 400px;
-      border-left: 1px solid #e5e7eb;
-      background: #ffffff;
+    .deliverables-box {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #f8fafc;
       display: flex;
       flex-direction: column;
-      height: 100%;
-      flex-shrink: 0;
-    }
-    .drawer-header {
-      padding: 11px 14px;
-      border-bottom: 1px solid #ebedf0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
       gap: 8px;
-      background: #fafbfc;
     }
-    .drawer-turn-tabs {
-      padding: 7px 14px;
-      border-bottom: 1px solid #f0f1f4;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      flex-wrap: wrap;
-      background: #ffffff;
-    }
-    .turn-tab-pill {
+    .file-pills-row { display: flex; flex-wrap: wrap; gap: 5px; }
+    .file-pill {
       font-size: 10.5px;
       font-weight: 600;
       padding: 3px 8px;
-      border-radius: 999px;
-      border: 1px solid #e2e5ec;
-      background: #f8fafc;
-      color: #4b5563;
-      cursor: pointer;
-    }
-    .turn-tab-pill.active {
-      background: #1e1b4b;
-      color: #ffffff;
-      border-color: #1e1b4b;
-    }
-
-    .drawer-scroll {
-      flex: 1;
-      overflow-y: auto;
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .verdict-box {
-      border-radius: 10px;
-      padding: 10px 12px;
-      border: 1px solid #a7f3d0;
-      background: #ecfdf5;
-      font-size: 12px;
-      color: #1e293b;
-      line-height: 1.5;
-      white-space: pre-wrap;
-    }
-    .steps-box {
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      overflow: hidden;
+      border-radius: 5px;
+      border: 1px solid #cbd5e1;
       background: #ffffff;
+      color: #1e293b;
+      cursor: pointer;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
-    .steps-box-header {
-      padding: 7px 10px;
-      background: #f8fafc;
-      border-bottom: 1px solid #e2e8f0;
-      font-size: 11px;
-      font-weight: 700;
-      color: #334155;
-      display: flex;
-      justify-content: space-between;
-    }
-    .steps-list {
+    .file-pill.active { background: #1e1b4b; color: #fff; border-color: #1e1b4b; }
+    .code-viewer-box {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 7px;
       padding: 8px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 10.5px;
-      color: #475569;
+      line-height: 1.45;
+      max-height: 190px;
+      overflow: auto;
+      white-space: pre;
     }
 
     .sticky-composer {
-      border-top: 1px solid #ebedf0;
-      padding: 10px 12px;
+      border-top: 1px solid var(--border-subtle);
+      padding: 10px 14px;
       background: #ffffff;
       display: flex;
       flex-direction: column;
@@ -540,8 +596,8 @@
     }
     .composer-textarea {
       width: 100%;
-      height: 52px;
-      border: 1px solid #d1d5db;
+      height: 48px;
+      border: 1px solid #cbd5e1;
       border-radius: 8px;
       padding: 6px 9px;
       font-size: 12px;
@@ -549,165 +605,144 @@
       resize: none;
       outline: none;
     }
-    .composer-textarea:focus { border-color: #4f46e5; }
     .composer-footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 6px;
-      position: relative;
     }
-    .trigger-chip-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3.5px 9px;
-      border-radius: 999px;
+    .target-chip {
       font-size: 10.5px;
       font-weight: 600;
-      border: 1px solid rgba(37, 99, 235, 0.3);
-      background: rgba(37, 99, 235, 0.08);
       color: #1e40af;
-      cursor: pointer;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 3px 8px;
+      border-radius: 999px;
     }
-    .send-btn {
-      background: #4f46e5; color: #ffffff; border: none;
-      border-radius: 7px; padding: 5px 12px; font-size: 11.5px; font-weight: 600; cursor: pointer;
-    }
-    .send-btn:hover { background: #4338ca; }
     .pill-btn {
-      background: #ffffff; border: 1px solid #d1d5db;
-      border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 600;
-      color: #1f2329; cursor: pointer;
-    }
-    .pill-btn:hover { background: #f9fafb; }
-
-    /* 新建 Issue 弹窗 */
-    .modal-backdrop {
-      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.35);
-      display: none; align-items: center; justify-content: center; z-index: 100;
-    }
-    .modal-backdrop.open { display: flex; }
-    .modal-card {
-      width: 500px; background: #ffffff; border-radius: 14px;
-      border: 1px solid #e5e7eb; box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
-      padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;
-    }
-    .modal-input {
-      width: 100%; height: 36px; border: 1px solid #d1d5db;
-      border-radius: 8px; padding: 0 10px; font-size: 13px; outline: none;
-    }
-    .modal-textarea {
-      width: 100%; height: 80px; border: 1px solid #d1d5db;
-      border-radius: 8px; padding: 8px 10px; font-size: 12.5px;
-      font-family: inherit; resize: none; outline: none;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #1f2329;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <div class="workspace-frame">
-    <!-- 1. 左侧栏：严格按 Issue 隔离切换（点哪个 Issue，右边整个画布就进入哪个 Issue 的独立沙盒！） -->
-    <aside class="issue-sidebar">
-      <div class="sidebar-brand">
-        <div class="brand-left">
-          <div class="brand-logo">N</div>
-          <span>Nocturn</span>
-        </div>
-        <span style="font-size:10.5px;color:#15803d;font-weight:600;">🟢 sota 在线</span>
-      </div>
-
-      <button class="new-issue-btn" onclick="openCreateModal()">＋ 新建任务 (New Issue)</button>
-
-      <div class="sidebar-section-title">
-        <span>任务列表 (按 Issue 隔离)</span>
-        <span id="sidebarIssueCount">4</span>
-      </div>
-      <div class="issue-nav-list" id="issueNavList"></div>
-    </aside>
-
-    <!-- 2. 主画面：当前选中 Issue 的内部连线拓扑（左小队成员 ⇄ 右本 Issue 的各棒 Session） + 右侧选中 Session 详情与介入抽屉 -->
-    <main class="main-surface">
-      <div class="issue-stage-pane">
-        <!-- 当前 Issue 顶栏 -->
-        <div class="issue-header-card" id="issueHeaderCard"></div>
-
-        <!-- 当前 Issue 专属的二部图：左边是小队成员，右边是这个 Issue 自己的第 1..4 棒 Session 胶囊 -->
-        <section class="now-card">
-          <div class="now-card-header">
+  <div class="app-layout">
+    <!-- 左主屏（自上而下）：第 1 层「你给 SuperAgent 下命令」 ➔ 第 2 层「SuperAgent 往下造人、派单、红队审查的实时拓扑」 -->
+    <main class="main-command-stage">
+      <!-- ==================== 第 1 层：SuperAgent 总控命令台（进来第一眼就在这里输入命令！） ==================== -->
+      <section class="superagent-hero-card">
+        <div class="hero-top-row">
+          <div class="hero-agent-identity">
+            <div class="boss-avatar">SA</div>
             <div>
-              <div style="font-size:13.5px;font-weight:700;color:#111827;" id="graphCardTitle">⚡ 本 Issue 内部接力拓扑 (点击任意智能体或回合胶囊，在右侧查看其 Session 并介入)</div>
-              <div style="font-size:11px;color:#64748b;margin-top:2px;">每个 Issue 拥有独立 Worktree 与独立 Session 链，不同 Issue 之间完全隔离、绝不串线</div>
+              <div class="boss-title">
+                <span>Nocturn SuperAgent 总控台</span>
+                <span style="font-size:11px;font-weight:600;color:#6d28d9;background:#f3e8ff;padding:2px 8px;border-radius:999px;">gemini-4-argon-high</span>
+              </div>
+              <div class="boss-sub">你只管在下方输入一句话命令 ➔ 总控自动往下建工单、按需造新专家、写代码并交由红队死磕验收</div>
             </div>
+          </div>
+          <span class="sota-online-badge">🟢 sota 远端引擎在线</span>
+        </div>
+
+        <!-- 最醒目的主命令输入框 -->
+        <div class="command-input-box">
+          <span style="font-size:16px;">💬</span>
+          <input
+            class="command-input-field"
+            id="mainCommandInput"
+            autofocus
+            placeholder="在这里直接给 SuperAgent 下命令（例如：写一个防 XSS 的 sanitize.js / 实现一个 LRU 缓存 lru.js 并跑通测试）..."
+          />
+          <button class="command-submit-btn" onclick="submitSuperAgentCommand()">⚡ 发送命令往下执行 ↵</button>
+        </div>
+
+        <!-- 一键试跑命令示例 -->
+        <div class="hero-bottom-row">
+          <div class="quick-presets">
+            <span>一键填入命令试试：</span>
+            <span class="preset-chip" onclick="fillPreset('实现一个 debounce.js 防抖模块，要求队长招募并发时序专家编写并通过红队审查')">⚡ 招募专家实现 debounce.js</span>
+            <span class="preset-chip" onclick="fillPreset('编写一个 URL 参数解析器 query-parser.js（防原型链污染），并经过红队安全探针审查')">🛡️ 编写防原型链污染的 query-parser.js</span>
+            <span class="preset-chip" onclick="fillPreset('画一个宇航员骑鲸鱼的 SVG 矢量图并校验 XML 结构')">🎨 画宇航员骑鲸鱼 SVG</span>
+          </div>
+        </div>
+
+        <!-- SuperAgent 总控实时回执（告诉你它刚刚怎么往下拆单和造人的） -->
+        <div class="boss-live-reply" id="bossLiveReply">
+          <span><strong>🤖 总控最新汇报：</strong>已完成 <code>TASK-452</code> —— 动态招募了安全专家 <code>@sec-sanitizer</code>，经 <code>@codex-reviewer</code> 2 轮 XSS/mXSS 红队攻防打回修复，27/27 测试全部通过并自动结单。随时在上方输入新命令！</span>
+        </div>
+      </section>
+
+      <!-- 视觉向下传导指示 -->
+      <div class="downward-connector">
+        <span class="downward-badge">⬇️ 总控接收命令后，自动往下调度团队与任务工单 (点击任意工单在右侧查看详情或中途插话) ⬇️</span>
+      </div>
+
+      <!-- ==================== 第 2 层：往下执行的全局跨任务连线图 (左：执行团队 ⇄ 右：派出的任务工单) ==================== -->
+      <section class="downward-execution-card">
+        <div class="exec-card-header">
+          <div>
+            <div style="font-size:13.5px;font-weight:800;color:#0f172a;">🕸️ 往下执行的团队与工单网络（左：总控麾下团队 ⇄ 右：派出的工单）</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
             <div class="legend-bar">
-              <span class="legend-tag"><svg width="18" height="8"><line x1="1" y1="4" x2="17" y2="4" stroke="#7c3aed" stroke-width="2.5"/></svg>队长派单/转交</span>
-              <span class="legend-tag"><svg width="18" height="8"><line x1="1" y1="4" x2="17" y2="4" stroke="#2563eb" stroke-width="2.5"/></svg>pi-coder 编码</span>
-              <span class="legend-tag"><svg width="18" height="8"><line x1="1" y1="4" x2="17" y2="4" stroke="#10b981" stroke-width="2.5"/></svg>reviewer 审查</span>
+              <span class="legend-tag"><svg width="16" height="8"><line x1="1" y1="4" x2="15" y2="4" stroke="#7c3aed" stroke-width="2.5"/></svg>总控队长</span>
+              <span class="legend-tag"><svg width="16" height="8"><line x1="1" y1="4" x2="15" y2="4" stroke="#2563eb" stroke-width="2.5"/></svg>常规编码</span>
+              <span class="legend-tag"><svg width="16" height="8"><line x1="1" y1="4" x2="15" y2="4" stroke="#d97706" stroke-width="2.5"/></svg>动态招募专家</span>
+              <span class="legend-tag"><svg width="16" height="8"><line x1="1" y1="4" x2="15" y2="4" stroke="#10b981" stroke-width="2.5"/></svg>红队审查</span>
             </div>
+            <button class="pill-btn" id="clearAgentFilterBtn" style="display:none;" onclick="setAgentFilter(null)">✕ 取消筛选</button>
           </div>
-
-          <div class="bipartite-stage" id="bipartiteStage">
-            <div class="left-column" id="leftColumn"></div>
-            <svg class="curves-svg" id="curvesSvg"></svg>
-            <div class="right-column" id="rightColumn"></div>
-          </div>
-        </section>
-
-        <!-- 当前 Issue 的交付产物与 sota 工作区真实源码文件 -->
-        <section class="deliverables-card" id="deliverablesCard"></section>
-      </div>
-
-      <!-- 3. 右侧伴随式 Session 抽屉：展示你在中间连线图里点中的那一棒 Session 详情，并支持从任意一棒定向重做！ -->
-      <aside class="session-peek-drawer">
-        <div class="drawer-header">
-          <span style="font-size:12px;font-weight:700;color:#1e1b4b;" id="drawerHeaderTitle">⚡ Session 详情</span>
-          <button class="pill-btn" style="color:#b45309;border-color:#fcd34d;background:#fffbeb;" onclick="promptRedoSelectedStage()" title="直接唤醒这一棒的原生 Session 重新执行，并自动触发其下游接力">↻ 从这一棒重做</button>
         </div>
 
-        <!-- 切换本 Issue 内的第 1..4 棒 Session -->
-        <div class="drawer-turn-tabs" id="drawerTurnTabs"></div>
-
-        <div class="drawer-scroll" id="drawerScroll"></div>
-
-        <div class="sticky-composer">
-          <textarea class="composer-textarea" id="composerInput" placeholder="直接向当前选中的智能体 Session 发送插话 (--steer) 或返工要求..."></textarea>
-          <div class="composer-footer">
-            <div class="trigger-chip-btn">
-              <span id="triggerChipLabel">⚡ 插话到 pi-coder (TASK-451)</span>
-            </div>
-            <button class="send-btn" id="sendCommentBtn">发送介入 ↵</button>
-          </div>
+        <div class="bipartite-stage" id="bipartiteStage">
+          <div class="left-column" id="leftColumn"></div>
+          <svg class="curves-svg" id="curvesSvg"></svg>
+          <div class="right-column" id="rightColumn"></div>
         </div>
-      </aside>
+      </section>
     </main>
-  </div>
 
-  <!-- 新建任务弹窗 -->
-  <div class="modal-backdrop" id="createModal" onclick="if(event.target===this)closeCreateModal()">
-    <div class="modal-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h3 style="margin:0;font-size:15px;">✨ 新建任务 (独立 Issue 沙盒)</h3>
-        <button class="pill-btn" onclick="closeCreateModal()">✕</button>
+    <!-- 右侧伴随抽屉：展示当前选中工单「底下是怎么一步步干的」+ 真实源码文件 + 对任意一步插话/重做 -->
+    <aside class="task-inspector-drawer">
+      <div class="inspector-header" id="inspectorHeader"></div>
+
+      <div class="inspector-scroll">
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="section-label">
+            <span>🔄 该工单向下执行的接力与红蓝攻防步骤 (点任意一步可查看日志或重做)</span>
+          </div>
+          <div id="timelineStepsList" style="display:flex;flex-direction:column;gap:7px;"></div>
+        </div>
+
+        <div class="deliverables-box" id="deliverablesBox"></div>
       </div>
-      <input class="modal-input" id="newIssueTitle" placeholder="输入任务标题（如：实现一个 debounce.js 防抖函数并通过单测）" />
-      <textarea class="modal-textarea" id="newIssueDesc" placeholder="补充详细说明（提交后将在 sota:/home/qijinyin/multimodal/yangxin/nocturn/worktrees/ 下创建该 Issue 专属目录，自动跑完『队长拆单 ➔ Coder编码 ➔ Reviewer审查 ➔ 自动结单』）..."></textarea>
-      <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;">
-        <input class="modal-input" id="newIssueBind" style="width:180px;height:32px;font-size:12px;" placeholder="🔗 绑定外部 Issue (#12)" />
-        <div style="display:flex;gap:8px;">
-          <button class="pill-btn" onclick="closeCreateModal()">取消</button>
-          <button class="send-btn" onclick="submitCreateIssue()">🚀 创建并在 sota 上启动</button>
+
+      <div class="sticky-composer">
+        <textarea class="composer-textarea" id="composerInput" placeholder="想干预当前选中的这一个具体步骤？在这里直接向该步骤的 Agent 插话 (--steer)..."></textarea>
+        <div class="composer-footer">
+          <span class="target-chip" id="composerTargetChip">⚡ 单步插话目标：sec-sanitizer (TASK-452)</span>
+          <button class="command-submit-btn" style="padding:5px 12px;font-size:11.5px;" id="sendSteerBtn">发送单步插话 ↵</button>
         </div>
       </div>
-    </div>
+    </aside>
   </div>
 
   <script>
     const API_BASE = "http://127.0.0.1:4100";
 
     let SQUAD_AGENTS = [
-      { id: "dev-leader", name: "研发小队队长", role: "队长", isLeader: true, model: "gemini-4-argon-high", color: "#7c3aed", initials: "队长", dotClass: "" },
-      { id: "pi-coder", name: "pi-coder", role: "编码组员", isLeader: false, model: "deepseek-v4.1-flash", color: "#2563eb", initials: "PI", dotClass: "blue" },
-      { id: "sec-sanitizer", name: "sec-sanitizer (动态招募)", role: "安全专家", isLeader: false, model: "deepseek-v4.1-flash", color: "#d97706", initials: "SEC", dotClass: "blue" },
-      { id: "codex-reviewer", name: "codex-reviewer", role: "审查组员", isLeader: false, model: "zgca/deepseek-flash", color: "#10b981", initials: "审", dotClass: "green" }
+      { id: "dev-leader", name: "总控队长 (Leader)", role: "接收命令 / 拆单 / 造人 / 转审", isLeader: true, isDynamic: false, model: "gemini-4-argon-high", color: "#7c3aed", initials: "总控" },
+      { id: "pi-coder", name: "pi-coder", role: "常驻编码组员", isLeader: false, isDynamic: false, model: "deepseek-v4.1-flash", color: "#2563eb", initials: "PI" },
+      { id: "sec-sanitizer", name: "sec-sanitizer", role: "总控动态招募 · 安全专家", isLeader: false, isDynamic: true, model: "deepseek-v4.1-flash", color: "#d97706", initials: "SEC" },
+      { id: "codex-reviewer", name: "codex-reviewer", role: "独立红队审查员", isLeader: false, isDynamic: false, model: "zgca/deepseek-flash", color: "#10b981", initials: "审" }
     ];
 
     let tasksData = [
@@ -715,101 +750,101 @@
         id: "task_452",
         identifier: "TASK-452",
         boundIssue: "nocturn#452",
-        title: "#452 动态招募安全专家 sec-sanitizer 实现 XSS 过滤模块 sanitize.js",
+        title: "动态招募安全专家 sec-sanitizer 实现 XSS 过滤模块 sanitize.js",
         squadId: "dev",
         status: "done",
+        implementerId: "sec-sanitizer",
         runs: [
           {
             id: "r452_1",
             agentId: "dev-leader",
             status: "completed",
-            stageLabel: "① 队长动态孵化专家 Session",
-            shortSummary: "当场孵化新专家 @sec-sanitizer 并委派实现 sanitize.js",
-            fullReport: "已通过 nocturn dispatch --to sec-sanitizer 当场动态孵化专职安全专家 sec-sanitizer（无需人工预配），初始化隔离分支 nocturn/task-452 (aa4cfea) 并派发任务。",
+            stageLabel: "① 总控队长接令 ➔ 动态造出专家 sec-sanitizer",
+            shortSummary: "判断需 Web 安全专精，当场孵化 @sec-sanitizer 并切出分支 nocturn/task-452",
             steps: [
               "初始化隔离 Git 分支: nocturn/task-452 (commit aa4cfea)",
               "bash: nocturn dispatch --task TASK-452 --to sec-sanitizer --instructions '专职 Web 安全与 XSS 过滤专家'",
-              "自动孵化新 Agent: sec-sanitizer 加入 dev 小队",
-              "Stop after dispatching: 派单回合完成"
+              "自动孵化新 Agent: sec-sanitizer 加入团队"
             ]
           },
           {
             id: "r452_2",
             agentId: "sec-sanitizer",
             status: "completed",
-            stageLabel: "② sec-sanitizer 初版实现 Session",
-            shortSummary: "提交初版 sanitize.js & 13 组测试 (commit 6d713aa)",
-            fullReport: "已交付初版 sanitize.js 与 sanitize.test.js（13 个测试组通过），提交到分支 nocturn/task-452 (commit 6d713aa) 并上报 state=ready。",
+            stageLabel: "② sec-sanitizer 初版编码实现 (commit 6d713aa)",
+            shortSummary: "编写初版 sanitize.js 与 13 组单测通过，上报 ready",
             steps: [
               "write: sanitize.js & sanitize.test.js",
               "bash: node sanitize.test.js -> 13/13 passed",
-              "bash: git commit -m 'feat(TASK-452): deliver verified changes' (6d713aa)",
-              "bash: nocturn report --task TASK-452 --agent sec-sanitizer --state ready"
+              "bash: git commit 6d713aa & nocturn report --state ready"
             ]
           },
           {
             id: "r452_3",
-            agentId: "codex-reviewer",
+            agentId: "dev-leader",
             status: "completed",
-            stageLabel: "③ Reviewer 第1轮攻防审查 (打回 Rework)",
-            shortSummary: "构造 5 条 XSS 绕过探针攻破初版正则，自动打回 rework",
-            fullReport: "初版 13/13 单测虽过，但用 node 探针实测发现 3 类真实可绕过 XSS 缺陷：\n1) 斜杠分隔属性未清除：<img/onerror=alert(1) src=x>\n2) HTML 实体编码绕过 URL 协议检测：java&#115;cript:alert(1)、javascript&#58;alert(1)\n3) 空白控制符拆分协议名：java\\tscript:alert(1)\n已调用 nocturn report --state rework 自动打回给 sec-sanitizer 原会话！",
+            stageLabel: "③ 总控队长居中转交红队审查",
+            shortSummary: "收到初版交付，居中转交 @codex-reviewer 进行独立红队测试",
             steps: [
-              "bash: node sanitize.test.js -> 13/13 pass",
-              "bash: 构造 5 条真实 XSS 绕过探针测试 -> 捕获 3 类高危绕过",
-              "bash: nocturn report --task TASK-452 --agent codex-reviewer --state rework"
+              "恢复队长会话: --session-id 2ba76eb9-347f-4420-8116-0fd6a48f21bf",
+              "bash: nocturn dispatch --task TASK-452 --to codex-reviewer"
             ]
           },
           {
             id: "r452_4",
-            agentId: "sec-sanitizer",
-            status: "completed",
-            stageLabel: "④ sec-sanitizer 第1轮返工 Session",
-            shortSummary: "恢复原会话 (445b4b38) 重写为标签 Tokenizer + 白名单 (commit b772902)",
-            fullReport: "恢复原会话修复全部 3 类绕过（commit b772902）：将全文正则重写为「逐个 start tag 重新 tokenize + URL 协议白名单 + 3 轮实体解码」，新增 7 组回归测试，20/20 测试组通过。",
-            steps: [
-              "恢复会话: --session-id 445b4b38-650b-443a-b2e7-62a802d76977",
-              "write: 重构 sanitize.js 为结构化标签解析 + URL 白名单",
-              "bash: node sanitize.test.js -> 20/20 test groups passed",
-              "bash: git commit b772902 & nocturn report --state ready"
-            ]
-          },
-          {
-            id: "r452_5",
             agentId: "codex-reviewer",
             status: "completed",
-            stageLabel: "⑤ Reviewer 第2轮攻防审查 (捕获 mXSS 再次打回)",
-            shortSummary: "构造变异型 mXSS 跨片段重组探针 (<scr<script>...ipt>) 再次打回",
-            fullReport: "复审确认上轮 3 类缺陷已修复，但进一步构造出变异型 XSS（mXSS）重组绕过：\n1) stripScriptTags('<scr<script>evil()</script>ipt>alert(1)</script>') 删掉内层后外层拼出完整可执行 <script>alert(1)</script>！\n2) 未闭合 '<img src=x onerror=alert(1)' 原样透传。\n要求改为不动点收敛循环 + 后置硬断言，再次打回 rework！",
+            stageLabel: "④ Reviewer 第1轮红队审查 ➔ 抓出 3 类 XSS 绕过打回 Rework",
+            shortSummary: "构造 5 条探针攻破初版正则 (<img/onerror=...>, java&#115;cript:)，自动打回 rework",
             steps: [
-              "bash: 构造嵌套重组探针 <scr<script>evil()</script>ipt> -> 捕获 mXSS 绕过",
+              "bash: 构造 5 条真实 XSS 绕过探针 -> 捕获斜杠分隔属性与实体编码绕过",
               "bash: nocturn report --task TASK-452 --agent codex-reviewer --state rework"
             ]
           },
           {
-            id: "r452_6",
+            id: "r452_5",
             agentId: "sec-sanitizer",
             status: "completed",
-            stageLabel: "⑥ sec-sanitizer 第2轮返工 Session",
-            shortSummary: "恢复原会话实现不动点收敛循环 + 幂等属性测试 (commit a14c287)",
-            fullReport: "恢复原会话 (445b4b38) 实现不动点收敛循环 + 硬后置兜底转义 + 未闭合标签转义（commit a14c287），新增 mXSS A1-A4 与全语料幂等性测试。",
+            stageLabel: "⑤ sec-sanitizer 第1轮返工修复 (commit b772902)",
+            shortSummary: "恢复原会话重构为标签 Tokenizer + URL 白名单 + 3 轮实体解码 (20/20 通过)",
             steps: [
               "恢复会话: --session-id 445b4b38-650b-443a-b2e7-62a802d76977",
-              "write: 实现 fixpoint 收敛循环与幂等校验",
-              "bash: git commit a14c287 & nocturn report --state ready"
+              "write: 重构 sanitize.js 为逐标签 Tokenizer + URL 协议白名单",
+              "bash: node sanitize.test.js -> 20/20 passed (commit b772902)"
+            ]
+          },
+          {
+            id: "r452_6",
+            agentId: "codex-reviewer",
+            status: "completed",
+            stageLabel: "⑥ Reviewer 第2轮红队审查 ➔ 捕获变异型 mXSS 再次打回",
+            shortSummary: "构造跨片段重组探针 <scr<script>evil()</script>ipt> 复现出活标签，再次打回 rework",
+            steps: [
+              "bash: 构造嵌套重组探针 <scr<script>evil()</script>ipt> -> 捕获 mXSS 重组漏洞",
+              "bash: nocturn report --task TASK-452 --agent codex-reviewer --state rework"
             ]
           },
           {
             id: "r452_7",
+            agentId: "sec-sanitizer",
+            status: "completed",
+            stageLabel: "⑦ sec-sanitizer 第2轮返工 ➔ 不动点收敛循环 (commit a14c287)",
+            shortSummary: "实现 fixpoint 不动点收敛循环 + 后置硬断言 + 幂等属性测试",
+            steps: [
+              "恢复会话: --session-id 445b4b38-650b-443a-b2e7-62a802d76977",
+              "write: 实现 fixpoint 收敛循环与全语料幂等校验 (commit a14c287)"
+            ]
+          },
+          {
+            id: "r452_8",
             agentId: "codex-reviewer",
             status: "completed",
-            stageLabel: "⑦ Reviewer 终审通过与自动结单 (Auto-Done)",
-            shortSummary: "27/27 测试组 + 22 条 XSS/mXSS 攻击语料 0 失败 (commit 8dfef58)",
-            fullReport: "审查通过，准出自动结单（commit 8dfef58）：mXSS 重组与未闭合标签缺陷全部关闭，27/27 测试组全部通过，22 条攻击语料（重组 script/style、on* 分隔符、十进制/十六进制/命名实体/双重编码 scheme、tab/newline/NUL 拆分、srcdoc、未闭合标签）经活标签检测 + 幂等校验 0 failures。系统已自动结单 (Auto-Done)。",
+            stageLabel: "⑧ Reviewer 终审通过 & 自动结单 (commit 8dfef58 · Auto-Done)",
+            shortSummary: "27/27 测试组 + 22 条 XSS/mXSS 攻击语料 0 失败，自动结单！",
             steps: [
               "bash: node sanitize.test.js -> 27/27 test groups passed",
               "bash: 22 条攻击语料活标签检测 + 幂等校验 -> 0 failures",
-              "bash: git commit 8dfef58 & nocturn report --state ready --risk low (Auto-Done)"
+              "bash: nocturn report --state ready --risk low -> Auto-Done"
             ]
           }
         ]
@@ -818,65 +853,43 @@
         id: "task_451",
         identifier: "TASK-451",
         boundIssue: "nocturn#451",
-        title: "#451 画一个svg，自行车骑鹈鹕",
+        title: "画一个 SVG：拟人化自行车骑在鹈鹕背上",
         squadId: "dev",
         status: "done",
+        implementerId: "pi-coder",
         svgUrl: "/api/bicycle-pelican.svg",
         runs: [
           {
             id: "r451_1",
             agentId: "dev-leader",
             status: "completed",
-            stageLabel: "① 队长拆单 Session",
-            shortSummary: "委派给 @pi-coder 绘制 bicycle-riding-pelican.svg",
-            fullReport: "已将任务 TASK-451 委派给 @pi-coder：在独立工作区创建 bicycle-riding-pelican.svg（拟人化自行车骑在鹈鹕背上），验证 XML 合法后立即汇报。派单完毕立即退出队长进程。",
-            steps: [
-              "初始化工作区 /home/qijinyin/multimodal/yangxin/nocturn/worktrees/task-451",
-              "模型路由: Deepseek-V4.1-Flash/gemini-4-argon-high",
-              "bash: nocturn dispatch --task TASK-451 --to pi-coder --order '创建 bicycle-riding-pelican.svg...'",
-              "Stop after dispatching: 派单回合完成"
-            ]
+            stageLabel: "① 总控队长拆单派发",
+            shortSummary: "委派给常驻组员 @pi-coder 绘制 bicycle-riding-pelican.svg",
+            steps: ["bash: nocturn dispatch --task TASK-451 --to pi-coder"]
           },
           {
             id: "r451_2",
             agentId: "pi-coder",
             status: "completed",
-            stageLabel: "② pi-coder 编码实现 Session",
-            shortSummary: "编写 bicycle-riding-pelican.svg (9,580B) & XML 校验通过",
-            fullReport: "已创建 worktrees/task-451/bicycle-riding-pelican.svg（9,580 字节，viewBox 0 0 800 620）：拟人化红色自行车（带笑脸与小黄旗）骑在奔跑的鹈鹕背上。已通过 python3 xml.dom.minidom 解析校验无误。",
-            steps: [
-              "模型路由: Deepseek-V4.1-Flash/deepseek-v4.1-flash",
-              "write: /home/qijinyin/multimodal/yangxin/nocturn/worktrees/task-451/bicycle-riding-pelican.svg (9,580B)",
-              "bash: python3 -c \"import xml.dom.minidom; xml.dom.minidom.parse('bicycle-riding-pelican.svg')\" -> XML OK",
-              "bash: nocturn report --task TASK-451 --agent pi-coder --state ready --risk low"
-            ]
+            stageLabel: "② pi-coder 绘制与 XML 校验",
+            shortSummary: "完成 bicycle-riding-pelican.svg (9,580B) 并通过 minidom 校验",
+            steps: ["write: bicycle-riding-pelican.svg (9,580B)", "bash: xml.dom.minidom.parse -> OK"]
           },
           {
             id: "r451_3",
             agentId: "dev-leader",
             status: "completed",
-            stageLabel: "③ 队长转交审查 Session",
-            shortSummary: "恢复原会话 (feef7bda) 转交 @codex-reviewer",
-            fullReport: "收到 pi-coder 完工汇报，跨周期恢复队长原生会话 (feef7bda-e352-4db4-8c5c-a777958aac49)，已将 TASK-451 转交给 @codex-reviewer 进行独立视觉与代码审查。",
-            steps: [
-              "恢复会话: --session-id feef7bda-e352-4db4-8c5c-a777958aac49",
-              "bash: nocturn dispatch --task TASK-451 --to codex-reviewer"
-            ]
+            stageLabel: "③ 总控队长居中转交审查",
+            shortSummary: "恢复原会话转交 @codex-reviewer 进行视觉与结构审查",
+            steps: ["bash: nocturn dispatch --task TASK-451 --to codex-reviewer"]
           },
           {
             id: "r451_4",
             agentId: "codex-reviewer",
             status: "completed",
-            stageLabel: "④ Reviewer 独立审查与结单 Session",
-            shortSummary: "Verdict=ready (risk=low) · 渲染核验通过，自动结单",
-            fullReport: "审查通过 (Verdict: ready, risk: low) — python xml.dom.minidom 解析通过（root svg, viewBox 0 0 800 620, 120 个元素），使用 cairosvg 渲染 PNG 并通过 read 工具肉眼确认构图正确无缺件。系统已自动验收结单 (Auto-Done)。",
-            steps: [
-              "模型路由: zgca/deepseek-flash",
-              "read: /home/qijinyin/multimodal/yangxin/nocturn/worktrees/task-451/bicycle-riding-pelican.svg",
-              "bash: cairosvg.svg2png -> /home/qijinyin/multimodal/yangxin/nocturn/tmp/t451-review.png",
-              "read: 视觉检查 t451-review.png 确认自行车骑在鹈鹕背上",
-              "bash: nocturn report --task TASK-451 --agent codex-reviewer --state ready --risk low"
-            ]
+            stageLabel: "④ Reviewer 视觉渲染核验 & 自动结单",
+            shortSummary: "cairosvg 渲染 PNG 并肉眼确认构图无缺件，自动结单 (Auto-Done)",
+            steps: ["bash: cairosvg.svg2png -> t451-review.png", "bash: nocturn report --state ready --risk low"]
           }
         ]
       },
@@ -884,156 +897,136 @@
         id: "task_450",
         identifier: "TASK-450",
         boundIssue: "nocturn#450",
-        title: "#450 实现 array-stats.js (mean 与 median) 并自动结单",
+        title: "实现 array-stats.js (mean 与 median) 并完成边界审查",
         squadId: "dev",
         status: "done",
+        implementerId: "pi-coder",
         runs: [
           {
             id: "r450_1",
             agentId: "dev-leader",
             status: "completed",
-            stageLabel: "① 队长拆单 Session",
+            stageLabel: "① 总控队长拆单派发",
             shortSummary: "委派给 @pi-coder 实现 array-stats.js 与单测",
-            fullReport: "已将任务 TASK-450 委派给 @pi-coder 实现 mean/median 与单元测试。",
             steps: ["bash: nocturn dispatch --task TASK-450 --to pi-coder"]
           },
           {
             id: "r450_2",
             agentId: "pi-coder",
             status: "completed",
-            stageLabel: "② pi-coder 编码实现 Session",
-            shortSummary: "完成 array-stats.js (Neumaier 补偿求和) & 12 项单测通过",
-            fullReport: "已编写 array-stats.js 与 array-stats.test.js，运行 node array-stats.test.js：12 passed, 0 failed。",
-            steps: [
-              "write: array-stats.js (3,473B) & array-stats.test.js (2,890B)",
-              "bash: node array-stats.test.js -> 12 pass / 0 fail",
-              "bash: nocturn report --task TASK-450 --agent pi-coder --state ready --risk low"
-            ]
+            stageLabel: "② pi-coder 编码实现",
+            shortSummary: "完成 Neumaier 补偿求和 mean/median 及 12 项单测通过",
+            steps: ["write: array-stats.js & array-stats.test.js", "bash: node array-stats.test.js -> 12/12 pass"]
           },
           {
             id: "r450_3",
             agentId: "dev-leader",
             status: "completed",
-            stageLabel: "③ 队长转交审查 Session",
-            shortSummary: "恢复原会话 (3be16ae6) 转交 @codex-reviewer",
-            fullReport: "恢复队长原会话，自动转交 @codex-reviewer 独立审查。",
+            stageLabel: "③ 总控队长居中转交审查",
+            shortSummary: "恢复队长会话转交 @codex-reviewer 审查",
             steps: ["bash: nocturn dispatch --task TASK-450 --to codex-reviewer"]
           },
           {
             id: "r450_4",
             agentId: "codex-reviewer",
             status: "completed",
-            stageLabel: "④ Reviewer 独立审查与结单 Session",
-            shortSummary: "独立复跑 12/12 单测 + 200 万元素边界抽查通过 (Auto-Done)",
-            fullReport: "独立审查通过：复跑 node array-stats.test.js 12/12 通过；额外抽查 [1e16,1,-1e16,2] 精度、200万长数组、稀疏数组与 8 类非法入参抛错，全部符合契约，低风险自动结单 (Auto-Done)。",
-            steps: [
-              "bash: node array-stats.test.js -> 12 pass / 0 fail",
-              "bash: 边界抽查脚本 (MAX_SAFE_INTEGER / 2e6 长数组 / 稀疏数组) 全部通过",
-              "bash: nocturn report --task TASK-450 --agent codex-reviewer --state ready --risk low"
-            ]
-          }
-        ]
-      },
-      {
-        id: "task_448",
-        identifier: "TASK-448",
-        boundIssue: "nocturn#448",
-        title: "#448 编写 string-utils.js (reverse 与 isPalindrome)",
-        squadId: "dev",
-        status: "done",
-        runs: [
-          {
-            id: "r448_1",
-            agentId: "dev-leader",
-            status: "completed",
-            stageLabel: "① 队长拆单 Session",
-            shortSummary: "委派给 @pi-coder 实现 string-utils.js",
-            fullReport: "已委派 @pi-coder 实现 string-utils.js 与单元测试。",
-            steps: ["bash: nocturn dispatch --task TASK-448 --to pi-coder"]
-          },
-          {
-            id: "r448_2",
-            agentId: "pi-coder",
-            status: "completed",
-            stageLabel: "② pi-coder 编码实现 Session",
-            shortSummary: "编写 string-utils.js & 13 项单测通过",
-            fullReport: "已完成 string-utils.js 与 string-utils.test.js，13 项单测全部通过。",
-            steps: ["write: string-utils.js & string-utils.test.js", "bash: node string-utils.test.js -> 13 pass"]
-          },
-          {
-            id: "r448_3",
-            agentId: "codex-reviewer",
-            status: "completed",
-            stageLabel: "③ Reviewer 独立审查与结单 Session",
-            shortSummary: "VERDICT: APPROVE (13/13 单测 + Emoji 代理对抽查通过)",
-            fullReport: "VERDICT: APPROVE — 独立复跑 13/13 单测通过，Emoji 代理对与 NFKC 归一化抽查全部通过。",
-            steps: ["bash: node string-utils.test.js -> 13 pass", "bash: nocturn report --state ready"]
-          }
-        ]
-      },
-      {
-        id: "task_445",
-        identifier: "TASK-445",
-        boundIssue: "nocturn#445",
-        title: "#445 画个鹈鹕骑自行车的s v g",
-        squadId: "dev",
-        status: "done",
-        svgUrl: "/api/pelican.svg",
-        runs: [
-          {
-            id: "r445_1",
-            agentId: "dev-leader",
-            status: "completed",
-            stageLabel: "① 队长拆单 Session",
-            shortSummary: "委派给 @pi-coder 绘制 pelican-bicycle.svg",
-            fullReport: "已委派 @pi-coder 绘制 pelican-bicycle.svg。",
-            steps: ["bash: nocturn dispatch --task TASK-445 --to pi-coder"]
-          },
-          {
-            id: "r445_2",
-            agentId: "pi-coder",
-            status: "completed",
-            stageLabel: "② pi-coder 绘制与验证 Session",
-            shortSummary: "完成 pelican-bicycle.svg (18,853B) 绘制与渲染验证",
-            fullReport: "已在 /home/qijinyin/multimodal/yangxin/nocturn/worktrees/task-445-pi-coder/pelican-bicycle.svg 完成绘制并通过 xmllint 与 cairosvg 验证。",
-            steps: ["write: pelican-bicycle.svg (18,853B)", "bash: xmllint --noout pelican-bicycle.svg"]
+            stageLabel: "④ Reviewer 200万长数组压测 & 自动结单",
+            shortSummary: "12/12 单测 + 200 万元素大数组与稀疏数组抽查通过 (Auto-Done)",
+            steps: ["bash: 边界与长数组抽查全部通过", "bash: nocturn report --state ready --risk low"]
           }
         ]
       }
     ];
 
     let selectedTaskId = "task_452";
-    let selectedRunIdx = 6; // 默认选中当前 Issue 的最后一棒 Session
+    let selectedStepIdx = 7;
+    let filterAgentId = null;
     let cachedWorktreeFiles = {};
     let activeFileByTask = {};
 
-    function selectIssue(taskId) {
+    function fillPreset(text) {
+      const inp = document.getElementById("mainCommandInput");
+      inp.value = text;
+      inp.focus();
+    }
+
+    // 核心入口：你在顶部大输入框给 SuperAgent 下命令 ➔ 它立即接令并往下建工单、造专家、写代码、红队验收！
+    function submitSuperAgentCommand() {
+      const inp = document.getElementById("mainCommandInput");
+      const cmdText = inp.value.trim();
+      if (!cmdText) { inp.focus(); return; }
+
+      const num = 450 + tasksData.length + 3;
+      const newCode = "TASK-" + num;
+      const newTask = {
+        id: "task_" + Date.now(),
+        identifier: newCode,
+        boundIssue: `nocturn#${num}`,
+        title: cmdText,
+        squadId: "dev",
+        status: "dispatching",
+        implementerId: "pi-coder",
+        runs: [
+          {
+            id: "run_init_" + Date.now(),
+            agentId: "dev-leader",
+            status: "running",
+            stageLabel: "① 总控队长接令 ➔ 正在往下拆单与调配专家",
+            shortSummary: `已收到你的命令：「${cmdText}」，正在 sota 上切出分支 nocturn/${newCode.toLowerCase()} 并调度执行组员...`,
+            steps: [`初始化隔离 Git 分支 nocturn/${newCode.toLowerCase()}`]
+          }
+        ]
+      };
+      tasksData.unshift(newTask);
+      inp.value = "";
+      document.getElementById("bossLiveReply").innerHTML = `
+        <span><strong>🤖 总控最新汇报：</strong>已收到你的命令！「${cmdText}」 ➔ 已为你生成工单 <code>${newCode}</code>，正在唤醒总控队长往下调配专家并在 <code>sota</code> 独立 Git 分支上执行...</span>
+      `;
+      selectTask(newTask.id);
+
+      fetch(`${API_BASE}/api/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: newCode,
+          title: cmdText,
+          description: `${cmdText}（请研发队长评估需求：若需特定领域专家可直接调用 nocturn dispatch --task ${newCode} --to <新专家ID> --instructions "<专家职责>" 当场动态造人派单，或委派给 pi-coder；实现并 git commit 后交由 codex-reviewer 红队审查直至自动结单）`,
+          squadId: "dev"
+        })
+      }).catch(() => {});
+    }
+
+    document.getElementById("mainCommandInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submitSuperAgentCommand();
+    });
+
+    function selectTask(taskId) {
       selectedTaskId = taskId;
       const t = tasksData.find(x => x.id === taskId) || tasksData[0];
-      selectedRunIdx = Math.max(0, (t.runs || []).length - 1);
+      selectedStepIdx = Math.max(0, (t.runs || []).length - 1);
       if (t && !cachedWorktreeFiles[t.identifier]) {
         fetchWorktreeFiles(t.identifier);
       }
       syncUI();
     }
 
-    function selectRunTurn(idx) {
-      selectedRunIdx = idx;
+    function selectTimelineStep(idx) {
+      selectedStepIdx = idx;
       syncUI();
     }
 
-    function selectAgentInIssue(agentId) {
-      const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
-      if (!t) return;
-      // 找到该 Agent 在本 Issue 里的最新一棒 Session
-      let foundIdx = -1;
-      (t.runs || []).forEach((r, i) => {
-        if (r.agentId === agentId) foundIdx = i;
-      });
-      if (foundIdx >= 0) {
-        selectedRunIdx = foundIdx;
-        syncUI();
+    function setAgentFilter(agentId) {
+      filterAgentId = filterAgentId === agentId ? null : agentId;
+      document.getElementById("clearAgentFilterBtn").style.display = filterAgentId ? "inline-block" : "none";
+      if (filterAgentId) {
+        const matched = tasksData.find(t => (t.runs || []).some(r => r.agentId === filterAgentId));
+        if (matched) {
+          selectedTaskId = matched.id;
+          const runIdx = (matched.runs || []).findIndex(r => r.agentId === filterAgentId);
+          if (runIdx >= 0) selectedStepIdx = runIdx;
+        }
       }
+      syncUI();
     }
 
     function fetchWorktreeFiles(taskCode) {
@@ -1042,129 +1035,90 @@
         .then(data => {
           if (data && Array.isArray(data.files)) {
             cachedWorktreeFiles[taskCode] = data;
-            renderIssueHeader();
-            renderDeliverablesCard();
+            renderGlobalBipartiteGraph();
+            renderInspectorDrawer();
           }
         })
         .catch(() => {});
     }
 
-    // 1. 渲染左侧按 Issue 隔离的导航列表
-    function renderIssueSidebar() {
-      document.getElementById("sidebarIssueCount").textContent = String(tasksData.length);
-      const listEl = document.getElementById("issueNavList");
-      listEl.innerHTML = tasksData.map(t => {
-        const isAct = t.id === selectedTaskId;
-        const stClass = t.status === "done" ? "done" : (t.status === "in_review" ? "review" : "running");
-        const stLabel = t.status === "done" ? "✅ 已结单" : (t.status === "in_review" ? "⚠️ 待审核" : "🟢 运行中");
-        return `
-          <div class="issue-nav-card ${isAct ? 'active' : ''}" onclick="selectIssue('${t.id}')">
-            <div class="issue-nav-top">
-              <span class="issue-nav-code">${t.identifier}</span>
-              <span class="issue-nav-status ${stClass}">${stLabel}</span>
-            </div>
-            <div class="issue-nav-title">${t.title}</div>
-            <div class="issue-nav-meta">
-              <span>🔗 ${t.boundIssue || t.identifier}</span>
-              <span>${(t.runs || []).length} 棒 Session</span>
-            </div>
-          </div>
-        `;
-      }).join("");
-    }
-
-    // 2. 渲染当前 Issue 顶栏
-    function renderIssueHeader() {
-      const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
-      if (!t) return;
-      const wtInfo = cachedWorktreeFiles[t.identifier];
-      const worktreeDir = wtInfo?.worktreePath || `/home/qijinyin/multimodal/yangxin/nocturn/worktrees/${t.identifier.toLowerCase()}`;
-      const gitBranch = wtInfo?.gitBranch || `nocturn/${t.identifier.toLowerCase()}`;
-      const gitCommit = wtInfo?.gitCommit ? ` · ${wtInfo.gitCommit}` : "";
-      const stLabel = t.status === "done" ? "✅ 已自动结单 (Auto-Done)" : (t.status === "in_review" ? "⚠️ 待你拍板" : "🟢 sota 正在执行");
-
-      document.getElementById("issueHeaderCard").innerHTML = `
-        <div class="issue-header-left">
-          <div class="issue-header-badges">
-            <span class="issue-nav-code" style="font-size:12px;">${t.identifier}</span>
-            <span class="issue-bind-chip" onclick="promptBindIssue('${t.id}')" title="点击修改绑定的外部 Issue">🔗 ${t.boundIssue || t.identifier}</span>
-            <span class="worktree-badge" style="color:#047857;border-color:#a7f3d0;background:#ecfdf5;">🌿 ${gitBranch}${gitCommit}</span>
-            <span class="worktree-badge">📁 ${worktreeDir}</span>
-          </div>
-          <h1 class="issue-title-main">${t.title}</h1>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button class="pill-btn" onclick="cycleTaskStatus('${t.id}')">${stLabel} ▾</button>
-          <button class="pill-btn" onclick="triggerTargetedRework('${t.id}')">↩️ 驳回返工 (Rework)</button>
-        </div>
-      `;
-    }
-
-    // 3. 渲染当前 Issue 专属的二部图（左：小队成员 ⇄ 右：本 Issue 的各棒 Session 胶囊）
-    function renderIssueBipartiteGraph() {
-      const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
-      if (!t) return;
-      const runs = t.runs || [];
-      const curRun = runs[selectedRunIdx] || runs[runs.length - 1];
-
+    function renderGlobalBipartiteGraph() {
       const leftCol = document.getElementById("leftColumn");
       const rightCol = document.getElementById("rightColumn");
 
-      // 左列：研发小队成员（含队长动态按需孵化的专职专家！）
       leftCol.innerHTML = `
         <div class="squad-pod">
           <div class="squad-pod-header">
-            <span>🛠️ 研发小队 (${t.identifier})</span>
-            <span style="color:#4f46e5;cursor:pointer;" onclick="promptRecruitSpecialist()" title="无需预先配置，按需动态孵化专职组员">＋ 动态招募专家</span>
+            <span>🛠️ 总控麾下团队 (${SQUAD_AGENTS.length} 人)</span>
           </div>
           ${SQUAD_AGENTS.map(a => {
-            const myRunsCount = runs.filter(r => r.agentId === a.id).length;
-            const isSelected = curRun && curRun.agentId === a.id;
+            const activeTasksCount = tasksData.filter(t => (t.runs || []).some(r => r.agentId === a.id)).length;
+            const isFiltered = filterAgentId === a.id;
             return `
-              <div class="actor-node ${a.isLeader ? '' : 'worker-indent'} ${isSelected ? 'selected-actor' : ''}"
+              <div class="actor-node ${a.isLeader ? '' : 'worker-indent'} ${isFiltered ? 'active-filter' : ''}"
                    data-actor-id="${a.id}"
-                   onclick="selectAgentInIssue('${a.id}')">
+                   onclick="setAgentFilter('${a.id}')">
                 <div class="actor-left">
                   <div class="actor-avatar" style="background:${a.color}">${a.initials}</div>
-                  <div>
-                    <div class="actor-name">${a.name}</div>
-                    <div class="actor-sub">${a.model} · ${myRunsCount} 棒</div>
+                  <div style="min-width:0;">
+                    <div class="actor-name">
+                      <span>${a.name}</span>
+                      ${a.isDynamic ? '<span class="actor-badge-dyn">动态造人</span>' : ''}
+                    </div>
+                    <div class="actor-sub">${a.role} · ${activeTasksCount} 工单</div>
                   </div>
                 </div>
-                <span class="origin-dot ${a.dotClass}"></span>
+                <span class="origin-dot" style="background:${a.color}"></span>
               </div>
             `;
           }).join("")}
         </div>
       `;
 
-      // 右列：本 Issue 内部的各个回合 Session 胶囊（第 1 棒 ➔ 第 2 棒 ➔ 第 3 棒 ➔ 第 4 棒）
-      rightCol.innerHTML = runs.map((r, idx) => {
-        const isSelected = idx === selectedRunIdx;
-        const isRunning = r.status === "running";
+      const visibleTasks = filterAgentId
+        ? tasksData.filter(t => (t.runs || []).some(r => r.agentId === filterAgentId))
+        : tasksData;
+
+      rightCol.innerHTML = visibleTasks.map(t => {
+        const isSel = t.id === selectedTaskId;
+        const stClass = t.status === "done" ? "done" : (t.status === "in_review" ? "review" : "running");
+        const stLabel = t.status === "done" ? "✅ 已自动结单" : (t.status === "in_review" ? "⚠️ 待拍板" : "🟢 正在往下执行");
+        const wtInfo = cachedWorktreeFiles[t.identifier];
+        const branchName = wtInfo?.gitBranch || `nocturn/${t.identifier.toLowerCase()}`;
+        const implId = t.implementerId || (t.runs?.find(r => r.agentId !== "dev-leader" && r.agentId !== "codex-reviewer")?.agentId) || "pi-coder";
+        const isSpec = implId !== "pi-coder";
+        const reworkCount = (t.runs || []).filter(r => String(r.stageLabel).includes("打回") || String(r.shortSummary).includes("rework")).length;
+
         return `
-          <div class="run-pill ${isSelected ? 'selected-pill' : ''}"
-               data-run-idx="${idx}"
-               data-agent-id="${r.agentId}"
-               onclick="selectRunTurn(${idx})">
-            <div class="run-pill-left">
-              <div class="run-pill-stage">
-                <span>${r.stageLabel || `第 ${idx + 1} 棒 · ${r.agentId}`}</span>
+          <div class="task-node-card ${isSel ? 'selected-task' : ''}"
+               data-task-id="${t.id}"
+               onclick="selectTask('${t.id}')">
+            <div class="task-card-top">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span class="task-code">${t.identifier}</span>
+                <span class="task-branch-tag">🌿 ${branchName}</span>
               </div>
-              <div class="run-pill-summary">${r.shortSummary || r.fullReport || ''}</div>
+              <span class="task-status-pill ${stClass}">${stLabel}</span>
             </div>
-            <span class="run-pill-badge ${isRunning ? 'running' : 'done'}">
-              ${isRunning ? '🟢 运行中' : `✓ ${(r.steps || []).length} 步`}
-            </span>
+            <div class="task-card-title">${t.title}</div>
+            <div class="task-relay-track">
+              <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+                <span class="mini-relay-chip leader">① 总控派单</span>
+                <span>➔</span>
+                <span class="mini-relay-chip ${isSpec ? 'spec' : 'coder'}">② ${implId}${isSpec ? ' (动态造人)' : ''}</span>
+                <span>⇄</span>
+                <span class="mini-relay-chip rev">③ Reviewer${reworkCount > 0 ? ` (${reworkCount}轮打回修复)` : ''}</span>
+              </div>
+              <span>${(t.runs || []).length} 步</span>
+            </div>
           </div>
         `;
       }).join("");
 
-      requestAnimationFrame(drawIssueCurves);
+      requestAnimationFrame(drawGlobalCurves);
     }
 
-    // 绘制左列智能体 ➔ 右列本 Issue 各棒 Session 胶囊的贝塞尔连线（因为在单个 Issue 内部，每根线对应一棒，永远清晰不乱！）
-    function drawIssueCurves() {
+    function drawGlobalCurves() {
       const stageEl = document.getElementById("bipartiteStage");
       const svgEl = document.getElementById("curvesSvg");
       const leftCol = document.getElementById("leftColumn");
@@ -1185,252 +1139,166 @@
       svgEl.setAttribute("viewBox", `0 0 ${stageRect.width} ${stageRect.height}`);
       svgEl.innerHTML = "";
 
-      rightCol.querySelectorAll(".run-pill").forEach(pillEl => {
-        const idx = Number(pillEl.dataset.runIdx);
-        const agentId = pillEl.dataset.agentId;
-        const src = actorAnchors[agentId];
-        if (!src) return;
-        const r = pillEl.getBoundingClientRect();
-        const dst = {
-          x: r.left - stageRect.left,
-          y: r.top - stageRect.top + r.height / 2
-        };
+      rightCol.querySelectorAll(".task-node-card").forEach(cardEl => {
+        const taskId = cardEl.dataset.taskId;
+        const task = tasksData.find(x => x.id === taskId);
+        if (!task) return;
+        const r = cardEl.getBoundingClientRect();
+        const isSelectedTask = taskId === selectedTaskId;
+        const isRunningTask = task.status !== "done";
 
-        const span = dst.x - src.x;
-        const pathData = `M ${src.x} ${src.y} C ${src.x + span * 0.46} ${src.y}, ${dst.x - span * 0.46} ${dst.y}, ${dst.x} ${dst.y}`;
+        const participantIds = [...new Set((task.runs || []).map(run => run.agentId))];
 
-        const isSelected = idx === selectedRunIdx;
-        const color =
-          agentId === "dev-leader"
-            ? "#7c3aed"
-            : agentId === "pi-coder"
-            ? "#2563eb"
-            : agentId === "codex-reviewer"
-            ? "#10b981"
-            : "#d97706";
+        participantIds.forEach((agentId, pIdx) => {
+          if (filterAgentId && agentId !== filterAgentId) return;
+          const src = actorAnchors[agentId];
+          if (!src) return;
 
-        if (isSelected) {
-          const glow = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          glow.setAttribute("d", pathData);
-          glow.setAttribute("fill", "none");
-          glow.setAttribute("stroke", color);
-          glow.setAttribute("stroke-width", "6");
-          glow.setAttribute("opacity", "0.18");
-          svgEl.appendChild(glow);
-        }
+          const offsetY = (pIdx - (participantIds.length - 1) / 2) * 8;
+          const dst = {
+            x: r.left - stageRect.left,
+            y: r.top - stageRect.top + r.height / 2 + offsetY
+          };
 
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        line.setAttribute("d", pathData);
-        line.setAttribute("fill", "none");
-        line.setAttribute("stroke", color);
-        line.setAttribute("stroke-width", isSelected ? "2.4" : "1.5");
-        line.setAttribute("opacity", isSelected ? "0.98" : "0.42");
-        svgEl.appendChild(line);
+          const span = dst.x - src.x;
+          const pathData = `M ${src.x} ${src.y} C ${src.x + span * 0.45} ${src.y}, ${dst.x - span * 0.45} ${dst.y}, ${dst.x} ${dst.y}`;
+
+          const agentObj = SQUAD_AGENTS.find(a => a.id === agentId);
+          const color = agentObj ? agentObj.color : "#64748b";
+          const emphasize = isSelectedTask || isRunningTask;
+
+          if (emphasize) {
+            const glow = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            glow.setAttribute("d", pathData);
+            glow.setAttribute("fill", "none");
+            glow.setAttribute("stroke", color);
+            glow.setAttribute("stroke-width", "5");
+            glow.setAttribute("opacity", "0.14");
+            svgEl.appendChild(glow);
+          }
+
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          line.setAttribute("d", pathData);
+          line.setAttribute("fill", "none");
+          line.setAttribute("stroke", color);
+          line.setAttribute("stroke-width", emphasize ? "2.2" : "1.2");
+          line.setAttribute("opacity", emphasize ? "0.92" : "0.18");
+          svgEl.appendChild(line);
+        });
       });
     }
 
-    // 4. 渲染本 Issue 的交付物与真实 sota 源码卡片
-    function renderDeliverablesCard() {
+    function renderInspectorDrawer() {
       const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
       if (!t) return;
-      const svgUrl = t.svgUrl || (t.identifier === "TASK-451" ? "/api/bicycle-pelican.svg" : (t.identifier === "TASK-445" ? "/api/pelican.svg" : null));
+      const runs = t.runs || [];
+      const curRun = runs[selectedStepIdx] || runs[runs.length - 1] || { agentId: "dev-leader", stageLabel: "初始化", steps: [] };
+      const wtInfo = cachedWorktreeFiles[t.identifier];
+      const gitBranch = wtInfo?.gitBranch || `nocturn/${t.identifier.toLowerCase()}`;
+      const gitCommit = wtInfo?.gitCommit ? ` · ${wtInfo.gitCommit}` : "";
+
+      document.getElementById("inspectorHeader").innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="task-code">${t.identifier}</span>
+            <span class="task-branch-tag">🌿 ${gitBranch}${gitCommit}</span>
+          </div>
+          <button class="pill-btn" onclick="triggerTargetedRework('${t.id}')">↩️ 整单驳回重做</button>
+        </div>
+        <h2 class="inspector-title">${t.title}</h2>
+      `;
+
+      document.getElementById("timelineStepsList").innerHTML = runs.map((r, idx) => {
+        const isAct = idx === selectedStepIdx;
+        const agentObj = SQUAD_AGENTS.find(a => a.id === r.agentId) || { color: "#2563eb", name: r.agentId };
+        const cleanLogs = (r.steps || []).filter(s => !String(s).startsWith("[sota Pi 1.5.0 回复] I'll start by inspecting"));
+        return `
+          <div class="timeline-step-card ${isAct ? 'active-step' : ''}" onclick="selectTimelineStep(${idx})">
+            <div class="step-card-header">
+              <div class="step-stage-title">
+                <span style="width:8px;height:8px;border-radius:50%;background:${agentObj.color};display:inline-block;"></span>
+                <span>${r.stageLabel || `第 ${idx + 1} 步 · ${r.agentId}`}</span>
+              </div>
+              <button class="redo-step-btn" onclick="event.stopPropagation();promptRedoFromStep(${idx})">↻ 从此步重做</button>
+            </div>
+            <div class="step-summary-text">${r.shortSummary || ''}</div>
+            <div class="step-raw-logs">
+              ${cleanLogs.map(st => `<div>• ${String(st)}</div>`).join("") || '<div>正在 sota 上执行...</div>'}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      const svgUrl = t.svgUrl || (t.identifier === "TASK-451" ? "/api/bicycle-pelican.svg" : null);
       const svgHtml = svgUrl ? `
-        <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#f8fafc;padding:8px;">
-          <img src="${API_BASE}${svgUrl}" style="width:100%;max-height:220px;object-fit:contain;display:block;background:#fff;border-radius:6px;" alt="SVG Deliverable"/>
+        <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;padding:6px;">
+          <img src="${API_BASE}${svgUrl}" style="width:100%;max-height:165px;object-fit:contain;display:block;" alt="SVG Deliverable"/>
         </div>
       ` : "";
 
-      const fileData = cachedWorktreeFiles[t.identifier];
-      const files = fileData?.files || [];
+      const files = wtInfo?.files || [];
       const activeIdx = activeFileByTask[t.identifier];
-
       const pillsHtml = files.length > 0
         ? files.map((f, i) => `
             <span class="file-pill ${activeIdx === i ? 'active' : ''}" onclick="toggleFileViewer('${t.identifier}', ${i})">
               📄 ${f.name} (${f.size} B)
             </span>
           `).join("")
-        : `<span class="file-pill" onclick="fetchWorktreeFiles('${t.identifier}')">📂 点击加载 sota 工作区源码文件</span>`;
+        : `<span class="file-pill" onclick="fetchWorktreeFiles('${t.identifier}')">📂 点击加载 sota 分支源码文件</span>`;
 
       const selFile = (activeIdx !== undefined && activeIdx !== null) ? files[activeIdx] : null;
       const codeHtml = selFile
         ? `<div class="code-viewer-box">${selFile.content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
         : "";
 
-      document.getElementById("deliverablesCard").innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <span style="font-size:13px;font-weight:700;color:#111827;">📦 本 Issue 交付产物与 sota 工作区文件 (点击文件名查看源码)</span>
-          <span style="font-size:11px;color:#4f46e5;cursor:pointer;font-weight:600;" onclick="fetchWorktreeFiles('${t.identifier}')">↻ 刷新 sota 文件</span>
+      document.getElementById("deliverablesBox").innerHTML = `
+        <div class="section-label">
+          <span>📦 交付产物与 sota 分支源码 (点击文件名查看代码)</span>
+          <span style="color:#4f46e5;cursor:pointer;font-size:10.5px;" onclick="fetchWorktreeFiles('${t.identifier}')">↻ 刷新</span>
         </div>
         ${svgHtml}
         <div class="file-pills-row">${pillsHtml}</div>
         ${codeHtml}
       `;
+
+      document.getElementById("composerTargetChip").textContent = `⚡ 单步插话目标：${curRun.agentId} (${t.identifier} · 第 ${selectedStepIdx + 1} 步)`;
     }
 
     function toggleFileViewer(taskCode, idx) {
       activeFileByTask[taskCode] = activeFileByTask[taskCode] === idx ? null : idx;
-      renderDeliverablesCard();
+      renderInspectorDrawer();
     }
 
-    // 5. 渲染右侧选中的那一棒 Session 详情抽屉
-    function renderSessionDrawer() {
+    function promptRedoFromStep(stepIdx) {
+      selectedStepIdx = stepIdx;
       const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
       if (!t) return;
-      const runs = t.runs || [];
-      const curRun = runs[selectedRunIdx] || runs[runs.length - 1] || { agentId: "pi-coder", stageLabel: "Session", fullReport: "", steps: [] };
-      const agentInfo = SQUAD_AGENTS.find(a => a.id === curRun.agentId) || SQUAD_AGENTS[1];
-
-      document.getElementById("drawerHeaderTitle").textContent = `${t.identifier} · ${curRun.stageLabel || agentInfo.name}`;
-      document.getElementById("triggerChipLabel").textContent = `⚡ 插话到 ${agentInfo.name} (${t.identifier})`;
-
-      document.getElementById("drawerTurnTabs").innerHTML = runs.map((r, idx) => `
-        <span class="turn-tab-pill ${idx === selectedRunIdx ? 'active' : ''}" onclick="selectRunTurn(${idx})">
-          第 ${idx + 1} 棒 · ${r.agentId}
-        </span>
-      `).join("");
-
-      const cleanSteps = (curRun.steps || []).filter(s => !String(s).startsWith("[sota Pi 1.5.0 回复] I'll start by inspecting"));
-      const cascadeHint = curRun.agentId === "pi-coder"
-        ? "重做此棒将恢复 pi-coder 原会话改代码 → 完成后自动唤醒队长转交 → Reviewer 自动复审结单"
-        : curRun.agentId === "codex-reviewer"
-        ? "重做此棒仅唤醒 codex-reviewer 重新独立审查，无需 pi-coder 重写代码"
-        : "重做此棒将唤醒队长重新拆单并触发下游组员执行";
-
-      document.getElementById("drawerScroll").innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div style="display:flex;align-items:center;gap:7px;">
-            <div class="actor-avatar" style="background:${agentInfo.color}">${agentInfo.initials}</div>
-            <div>
-              <div style="font-size:13px;font-weight:700;color:#111827;">${agentInfo.name} · 绑定会话 (${t.identifier})</div>
-              <div style="font-size:10.5px;color:#64748b;">模型：${agentInfo.model} · 隔离目录：worktrees/${t.identifier.toLowerCase()}</div>
-            </div>
-          </div>
-        </div>
-
-        <div style="font-size:11px;color:#4338ca;background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:7px 10px;">
-          <strong>🔗 阶段重做联动规则：</strong>${cascadeHint}
-        </div>
-
-        <div class="verdict-box">${curRun.fullReport || curRun.shortSummary || '正在 sota 上执行当前回合...'}</div>
-
-        <div class="steps-box">
-          <div class="steps-box-header">
-            <span>⚡ 本回合 sota 工具执行步骤 (${cleanSteps.length} 步)</span>
-            <span>Pi 1.5.0</span>
-          </div>
-          <div class="steps-list">
-            ${cleanSteps.map(st => `<div>• ${String(st)}</div>`).join("") || '<div>等待步骤输出...</div>'}
-          </div>
-        </div>
-      `;
-    }
-
-    // 从当前选中的这一棒直接重做（定向唤醒该角色的原生 Session，并自动串联后续棒次）
-    function promptRedoSelectedStage() {
-      const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
-      if (!t) return;
-      const runs = t.runs || [];
-      const curRun = runs[selectedRunIdx] || runs[runs.length - 1] || { agentId: "pi-coder", stageLabel: "当前阶段" };
-      const defaultPrompt = curRun.agentId === "pi-coder"
-        ? "在当前代码基础上再补充一个边界测试并重新运行验证"
-        : curRun.agentId === "codex-reviewer"
-        ? "请重新严格复跑一次测试并给出审查结论"
-        : "请重新将此任务委派给 pi-coder 执行";
-
+      const curRun = (t.runs || [])[stepIdx] || { agentId: "pi-coder", stageLabel: "当前步骤" };
       const instruction = prompt(
-        `【从 ${curRun.stageLabel} (${curRun.agentId}) 重做】\n请输入给 @${curRun.agentId} 的重做/修改指令（将在 sota 上恢复其原生 Session 执行，并自动触发下游接力）：`,
-        defaultPrompt
+        `【从「${curRun.stageLabel}」重做】\n请输入给 @${curRun.agentId} 的修改/重做指令（将在 sota 上恢复其原会话执行，并自动触发后续队长转审与 Reviewer 复核）：`,
+        "请补充边界条件测试并重新验证交付"
       );
       if (!instruction) return;
       document.getElementById("composerInput").value = instruction;
-      document.getElementById("sendCommentBtn").click();
-    }
-
-    function openCreateModal() {
-      document.getElementById("createModal").classList.add("open");
-      document.getElementById("newIssueTitle").focus();
-    }
-    function closeCreateModal() {
-      document.getElementById("createModal").classList.remove("open");
-    }
-
-    function submitCreateIssue() {
-      const titleEl = document.getElementById("newIssueTitle");
-      const descEl = document.getElementById("newIssueDesc");
-      const bindEl = document.getElementById("newIssueBind");
-      const val = titleEl.value.trim();
-      if (!val) { titleEl.focus(); return; }
-
-      const num = 452 + tasksData.length;
-      const newCode = "TASK-" + num;
-      const boundIssue = bindEl.value.trim() || `nocturn#${num}`;
-      const newTask = {
-        id: "task_" + Date.now(),
-        identifier: newCode,
-        boundIssue,
-        title: `#${num} ${val}`,
-        squadId: "dev",
-        status: "dispatching",
-        runs: [
-          {
-            id: "run_init_" + Date.now(),
-            agentId: "dev-leader",
-            status: "running",
-            stageLabel: "① 队长拆单 Session",
-            shortSummary: "正在 sota 上唤醒研发队长拆单派发...",
-            fullReport: `已创建独立 Issue 沙盒 ${newCode}，正在 sota:/home/qijinyin/multimodal/yangxin/nocturn/worktrees/${newCode.toLowerCase()} 启动研发队长...`,
-            steps: [`初始化隔离工作区 worktrees/${newCode.toLowerCase()}`]
-          }
-        ]
-      };
-      tasksData.unshift(newTask);
-      titleEl.value = "";
-      descEl.value = "";
-      bindEl.value = "";
-      closeCreateModal();
-      selectIssue(newTask.id);
-
-      fetch(`${API_BASE}/api/tasks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          identifier: newCode,
-          title: `#${num} ${val}`,
-          description: `${val} ${descEl.value.trim()}（关联 Issue: ${boundIssue}。请研发队长调用 nocturn dispatch 委派给 pi-coder 实现并验证，完成后立即调用 nocturn report --state ready --risk low 交付）`,
-          squadId: "dev"
-        })
-      }).catch(() => {});
-    }
-
-    function cycleTaskStatus(taskId) {
-      const t = tasksData.find(x => x.id === taskId);
-      if (!t) return;
-      t.status = t.status === "in_progress" ? "in_review" : (t.status === "in_review" ? "done" : "in_progress");
-      fetch(`${API_BASE}/api/tasks/status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: t.identifier, status: t.status })
-      }).catch(() => {});
-      syncUI();
+      document.getElementById("sendSteerBtn").click();
     }
 
     function triggerTargetedRework(taskId) {
       const t = tasksData.find(x => x.id === taskId);
       if (!t) return;
-      const reason = prompt(`请输入对 ${t.identifier} 的驳回返工意见（将在 sota 上恢复该 Issue 的原会话继续修改）：`, "请再补充一个边界测试并重新汇报");
+      const reason = prompt(`请输入对 ${t.identifier} 的驳回返工要求：`, "请增加一组异常输入测试并重新提交审查");
       if (!reason) return;
       t.status = "in_progress";
+      const impl = t.implementerId || "pi-coder";
       t.runs.push({
         id: "run_rework_" + Date.now(),
-        agentId: "pi-coder",
+        agentId: impl,
         status: "running",
-        stageLabel: `第 ${t.runs.length + 1} 棒 · 定向返工 Session`,
+        stageLabel: `第 ${t.runs.length + 1} 步 · ${impl} 返工修复`,
         shortSummary: `收到返工要求：「${reason}」`,
-        fullReport: `正在 sota 上恢复 ${t.identifier} 的原 pi-coder 会话执行返工：「${reason}」`,
-        steps: [`↩️ 驳回返工：${reason}`]
+        steps: [`↩️ 人工驳回返工：${reason}`]
       });
-      selectedRunIdx = t.runs.length - 1;
+      selectedStepIdx = t.runs.length - 1;
       fetch(`${API_BASE}/api/rework`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1439,43 +1307,14 @@
       syncUI();
     }
 
-    function triggerLiveSotaTurn() {
-      const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
-      if (!t) return;
-      const curRun = (t.runs || [])[selectedRunIdx] || { agentId: "pi-coder" };
-      fetch(`${API_BASE}/api/sota/exec`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskId: t.identifier,
-          agentId: curRun.agentId,
-          prompt: `请用一句话汇报你在任务 ${t.identifier} 工作区下的当前文件与状态。`
-        })
-      }).catch(() => {});
-    }
-
-    function promptBindIssue(taskId) {
-      const t = tasksData.find(x => x.id === taskId);
-      if (!t) return;
-      const val = prompt(`为任务 ${t.identifier} 绑定外部或仓库 Issue：`, t.boundIssue || `nocturn#${t.identifier.replace("TASK-", "")}`);
-      if (val === null) return;
-      t.boundIssue = val.trim();
-      fetch(`${API_BASE}/api/tasks/bind-issue`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: t.identifier, issueRef: t.boundIssue })
-      }).catch(() => {});
-      syncUI();
-    }
-
-    document.getElementById("sendCommentBtn").addEventListener("click", () => {
+    document.getElementById("sendSteerBtn").addEventListener("click", () => {
       const inp = document.getElementById("composerInput");
       const val = inp.value.trim();
       if (!val) return;
       const t = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
       if (!t) return;
-      const curRun = (t.runs || [])[selectedRunIdx] || { agentId: "pi-coder", steps: [] };
-      curRun.steps.push(`⚡ 你向 ${curRun.agentId} 插话 (delivered): ${val}`);
+      const curRun = (t.runs || [])[selectedStepIdx] || { agentId: "pi-coder", steps: [] };
+      curRun.steps.push(`⚡ 你向 ${curRun.agentId} 介入: ${val}`);
       inp.value = "";
       syncUI();
 
@@ -1487,80 +1326,46 @@
     });
 
     function syncUI() {
-      renderIssueSidebar();
-      renderIssueHeader();
-      renderIssueBipartiteGraph();
-      renderDeliverablesCard();
-      renderSessionDrawer();
+      renderGlobalBipartiteGraph();
+      renderInspectorDrawer();
     }
 
-    function promptRecruitSpecialist() {
-      const spec = prompt(
-        "【动态孵化专职组员 (SuperAgent 模式)】\n除了队长调用 nocturn dispatch/recruit 自动按需造人外，你也可以直接输入「专职ID:显示名:职责说明」当场孵化新专家：",
-        "sec-auditor:安全审计专家:专职负责 SQL/Shell 注入审计与边界压测"
-      );
-      if (!spec) return;
-      const parts = spec.split(":");
-      const id = (parts[0] || "specialist-" + Date.now()).trim();
-      const name = (parts[1] || id).trim();
-      const instructions = (parts[2] || "专职执行组员").trim();
-      if (!SQUAD_AGENTS.some(a => a.id === id)) {
-        SQUAD_AGENTS.push({
-          id,
-          name,
-          role: "动态专家",
-          isLeader: false,
-          model: "deepseek-v4.1-flash",
-          color: "#d97706",
-          initials: name.slice(0, 2).toUpperCase(),
-          dotClass: "blue"
-        });
-      }
-      fetch(`${API_BASE}/api/cli`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          command: "recruit",
-          args: { id, name, squad: "dev", instructions }
-        })
-      }).catch(() => {});
-      syncUI();
-    }
-
-    // 实时同步后端 SQLite 中的每个 Issue 及其内部的 Runs + 动态招募的专家
     function applyBackendSnapshot(snap) {
       if (!snap || !Array.isArray(snap.tasks) || snap.tasks.length === 0) return;
       if (Array.isArray(snap.agents)) {
         snap.agents.forEach(ag => {
           if (ag.squadId === "dev" && !SQUAD_AGENTS.some(x => x.id === ag.id)) {
-            SQUAD_AGENTS.push({
+            SQUAD_AGENTS.splice(SQUAD_AGENTS.length - 1, 0, {
               id: ag.id,
               name: ag.name || ag.id,
-              role: ag.role === "leader" ? "队长" : "动态专家",
-              isLeader: ag.role === "leader",
+              role: "总控动态招募专家",
+              isLeader: false,
+              isDynamic: true,
               model: (ag.model || "deepseek-v4.1-flash").split("/").pop(),
               color: "#d97706",
-              initials: (ag.name || ag.id).slice(0, 2).toUpperCase(),
-              dotClass: "blue"
+              initials: (ag.id || "SP").slice(0, 3).toUpperCase()
             });
           }
         });
       }
+
       tasksData = snap.tasks.map(t => {
         const rawRuns = (snap.runs || []).filter(r => r.taskId === t.id);
+        const implRun = rawRuns.find(r => r.agentId !== "dev-leader" && r.agentId !== "codex-reviewer");
         const mappedRuns = rawRuns.map((r, idx) => {
-          let stageLabel = `第 ${idx + 1} 棒 · ${r.agentId} Session`;
-          if (idx === 0 && r.agentId === "dev-leader") stageLabel = "① 队长拆单与孵化专家 Session";
-          else if (idx === 1 && r.agentId !== "dev-leader" && r.agentId !== "codex-reviewer") stageLabel = `② ${r.agentId} 编码实现 Session`;
-          else if (r.agentId === "dev-leader") stageLabel = `③ 队长转交审查 Session`;
-          else if (r.agentId === "codex-reviewer") stageLabel = `④ Reviewer 独立审查与结单 Session`;
+          let stageLabel = `第 ${idx + 1} 步 · ${r.agentId}`;
+          if (idx === 0 && r.agentId === "dev-leader") stageLabel = "① 总控接令 ➔ 往下拆单与调配专家";
+          else if (r.agentId === "dev-leader") stageLabel = `第 ${idx + 1} 步 · 总控居中转交红队审查`;
+          else if (r.agentId === "codex-reviewer" && r.verdict?.state === "rework") stageLabel = `第 ${idx + 1} 步 · Reviewer 红队挑刺 (打回 Rework)`;
+          else if (r.agentId === "codex-reviewer") stageLabel = `第 ${idx + 1} 步 · Reviewer 终审通过 & 自动结单`;
+          else stageLabel = `第 ${idx + 1} 步 · ${r.agentId} 编码实现`;
+
           return {
             id: r.id,
             agentId: r.agentId,
             status: r.status,
             stageLabel,
             shortSummary: r.verdict?.summary || r.summary,
-            fullReport: r.verdict?.summary || r.summary,
             steps: (r.steps || []).map(st => st.text)
           };
         });
@@ -1568,19 +1373,28 @@
           id: t.id,
           identifier: t.identifier,
           boundIssue: t.boundIssue || `nocturn#${t.identifier.replace("TASK-", "")}`,
-          title: t.title,
+          title: t.title.replace(/^#\d+\s*/, ""),
           squadId: t.squadId || "dev",
           status: t.status,
+          implementerId: implRun?.agentId || "pi-coder",
           svgUrl: t.identifier === "TASK-451" ? "/api/bicycle-pelican.svg" : (t.identifier === "TASK-445" ? "/api/pelican.svg" : null),
           runs: mappedRuns
         };
       });
 
+      const latestTask = tasksData[0];
+      if (latestTask) {
+        const latestVerdictText = latestTask.runs?.[latestTask.runs.length - 1]?.shortSummary || "正在往下调度执行中...";
+        document.getElementById("bossLiveReply").innerHTML = `
+          <span><strong>🤖 总控最新汇报 (${latestTask.identifier})：</strong>${latestVerdictText.slice(0, 140)}</span>
+        `;
+      }
+
       const cur = tasksData.find(x => x.id === selectedTaskId) || tasksData[0];
       if (cur) {
         selectedTaskId = cur.id;
-        if (selectedRunIdx >= (cur.runs || []).length) {
-          selectedRunIdx = Math.max(0, (cur.runs || []).length - 1);
+        if (selectedStepIdx >= (cur.runs || []).length) {
+          selectedStepIdx = Math.max(0, (cur.runs || []).length - 1);
         }
         if (!cachedWorktreeFiles[cur.identifier]) {
           fetchWorktreeFiles(cur.identifier);
@@ -1598,8 +1412,8 @@
       };
     } catch {}
 
-    window.addEventListener("resize", () => requestAnimationFrame(drawIssueCurves));
-    selectIssue(selectedTaskId);
+    window.addEventListener("resize", () => requestAnimationFrame(drawGlobalCurves));
+    selectTask(selectedTaskId);
   </script>
 </body>
 </html>
