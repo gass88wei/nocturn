@@ -11,7 +11,13 @@
 import type { NocturnEngine } from "../core/engine.ts";
 import type { RiskLevel, VerdictState } from "../core/model.ts";
 
-export type NocturnCliCommand = "report" | "handback" | "dispatch" | "fanout" | "note";
+export type NocturnCliCommand =
+  | "report"
+  | "handback"
+  | "dispatch"
+  | "fanout"
+  | "note"
+  | "recruit";
 
 export function executeAgentCliCommand(
   engine: NocturnEngine,
@@ -57,6 +63,21 @@ export function executeAgentCliCommand(
         taskId: String(args.task ?? ""),
         workerAgentId: String(args.to ?? ""),
         orderText: String(args.order ?? ""),
+        workerInstructions: args.instructions ? String(args.instructions) : undefined,
+      });
+    }
+
+    case "recruit": {
+      const skillsRaw = args.skills ? String(args.skills) : "";
+      return engine.recruitSpecialistOrSquad({
+        agentId: String(args.id ?? args.agent ?? ""),
+        name: args.name ? String(args.name) : undefined,
+        squadId: args.squad ? String(args.squad) : "dev",
+        squadName: args.squad_name ? String(args.squad_name) : undefined,
+        role: (args.role as "leader" | "worker" | undefined) ?? "worker",
+        model: args.model ? String(args.model) : undefined,
+        skills: skillsRaw ? skillsRaw.split(",").map((s) => s.trim()) : undefined,
+        instructions: args.instructions ? String(args.instructions) : undefined,
       });
     }
 

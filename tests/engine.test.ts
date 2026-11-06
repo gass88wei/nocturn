@@ -445,4 +445,39 @@ describe("Nocturn Core Engine & Distilled Mechanisms", () => {
       "SSH mode command initializes isolated Git branch inside sota worktree"
     );
   });
+
+  it("SuperAgent-Style Dynamic Specialist & Squad Creation: Leader can recruit new specialists or auto-spawn unregistered workers on dispatch without manual pre-config", () => {
+    const { store, engine } = setupSeededEngine();
+    const task = engine.createTask({
+      identifier: "TASK-800",
+      title: "执行 SQL 注入安全渗透审计",
+      squadId: "dev",
+    });
+
+    // 1. Leader dispatches directly to a specialist ID ('sec-auditor') that was NEVER manually pre-configured!
+    executeAgentCliCommand(engine, "dispatch", {
+      task: task.id,
+      to: "sec-auditor",
+      order: "对 SQLite 层做参数化绑定审计",
+      instructions: "专职安全审计员",
+    });
+
+    const autoSpawned = store.getAgent("sec-auditor");
+    assert.ok(autoSpawned, "Unregistered specialist 'sec-auditor' was automatically materialized on dispatch");
+    assert.equal(autoSpawned!.squadId, "dev");
+    assert.ok(store.listSquads().find((s) => s.id === "dev")!.memberIds.includes("sec-auditor"));
+
+    // 2. Leader can also explicitly form a brand-new Squad & Specialist via `nocturn recruit`
+    executeAgentCliCommand(engine, "recruit", {
+      id: "perf-profiler",
+      name: "性能压测专家",
+      squad: "perf-squad",
+      squad_name: "性能特种小队",
+      skills: "benchmark,flamegraph",
+      instructions: "专职负责百万级并发与内存火焰图剖析",
+    });
+    const newSquad = store.listSquads().find((s) => s.id === "perf-squad");
+    assert.ok(newSquad, "New squad 'perf-squad' dynamically created without manual pre-configuration");
+    assert.ok(newSquad!.memberIds.includes("perf-profiler"));
+  });
 });

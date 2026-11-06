@@ -145,6 +145,7 @@ export class NocturnEngine {
 
       const createdChildren: Task[] = [];
       for (const item of params.subtasks) {
+        this.ensureDynamicWorkerInSquad(parent.squadId, item.workerAgentId, item.orderText);
         const child: Task = {
           id: uid("task"),
           identifier: item.identifier,
@@ -170,6 +171,79 @@ export class NocturnEngine {
       this.notifyChange();
       return createdChildren;
     });
+  }
+
+  /**
+   * SuperAgent-style Dynamic Specialist / Squad Recruitment:
+   * Unlike Multica (which requires manual human pre-configuration of all Agents & Squads),
+   * Nocturn allows the Leader (or `dispatch`/`fanout`/`recruit`) to dynamically materialize
+   * a new specialist Agent or even a new Squad on the fly when a task demands it.
+   */
+  recruitSpecialistOrSquad(params: {
+    agentId: string;
+    name?: string;
+    squadId?: string;
+    squadName?: string;
+    role?: Agent["role"];
+    model?: string;
+    skills?: string[];
+    instructions?: string;
+  }): { agent: Agent; squad: Squad } {
+    return this.store.atomic(() => {
+      const squadId = params.squadId ?? "dev";
+      let squad = this.store.listSquads().find((s) => s.id === squadId);
+      const role = params.role ?? "worker";
+      const model =
+        params.model ??
+        (role === "leader"
+          ? "Deepseek-V4.1-Flash/gemini-4-argon-high"
+          : "Deepseek-V4.1-Flash/deepseek-v4.1-flash");
+
+      const agent: Agent = {
+        id: params.agentId,
+        name: params.name ?? params.agentId,
+        squadId,
+        role,
+        cli: "pi",
+        model,
+        skills: params.skills?.length ? params.skills : ["specialist", "coding"],
+        instructions:
+          params.instructions ??
+          `由队长按任务需求动态招募的专职组员 (${params.name ?? params.agentId})`,
+      };
+      this.store.saveAgent(agent);
+
+      if (!squad) {
+        squad = {
+          id: squadId,
+          name: params.squadName ?? `${squadId} 特种小队`,
+          leaderId: role === "leader" ? agent.id : "dev-leader",
+          memberIds: [role === "leader" ? agent.id : "dev-leader", agent.id],
+        };
+      } else if (!squad.memberIds.includes(agent.id)) {
+        squad.memberIds.push(agent.id);
+      }
+      this.store.saveSquad(squad);
+      this.notifyChange();
+      return { agent, squad };
+    });
+  }
+
+  /**
+   * Automatically materialize a Worker Agent into the Squad if the Leader dispatches to a specialist ID not yet in DB.
+   */
+  private ensureDynamicWorkerInSquad(squadId: string, workerAgentId: string, orderHint?: string): Agent {
+    const existing = this.store.getAgent(workerAgentId);
+    if (existing) return existing;
+    return this.recruitSpecialistOrSquad({
+      agentId: workerAgentId,
+      name: workerAgentId,
+      squadId,
+      role: "worker",
+      instructions: orderHint
+        ? `由队长动态招募的专职组员，核心目标：${orderHint.slice(0, 120)}`
+        : "由队长按需动态招募的专职组员",
+    }).agent;
   }
 
   /**
@@ -279,10 +353,18 @@ export class NocturnEngine {
     taskId: string;
     workerAgentId: string;
     orderText: string;
+    workerInstructions?: string;
   }): { task: Task; workerRun: AgentRun } {
     return this.store.atomic(() => {
       const task = this.store.getTask(params.taskId);
       if (!task) throw new Error(`Task not found: ${params.taskId}`);
+
+      // If the Leader dispatches to a brand-new specialist ID, dynamically recruit it on the fly!
+      this.ensureDynamicWorkerInSquad(
+        task.squadId,
+        params.workerAgentId,
+        params.workerInstructions ?? params.orderText
+      );
 
       const now = new Date().toISOString();
       task.assignedWorkerId = params.workerAgentId;

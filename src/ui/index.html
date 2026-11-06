@@ -703,7 +703,7 @@
   <script>
     const API_BASE = "http://127.0.0.1:4100";
 
-    const SQUAD_AGENTS = [
+    let SQUAD_AGENTS = [
       { id: "dev-leader", name: "研发小队队长", role: "队长", isLeader: true, model: "gemini-4-argon-high", color: "#7c3aed", initials: "队长", dotClass: "" },
       { id: "pi-coder", name: "pi-coder", role: "编码组员", isLeader: false, model: "deepseek-v4.1-flash", color: "#2563eb", initials: "PI", dotClass: "blue" },
       { id: "codex-reviewer", name: "codex-reviewer", role: "审查组员", isLeader: false, model: "zgca/deepseek-flash", color: "#10b981", initials: "审", dotClass: "green" }
@@ -1006,12 +1006,12 @@
       const leftCol = document.getElementById("leftColumn");
       const rightCol = document.getElementById("rightColumn");
 
-      // 左列：研发小队成员（点击某个成员，自动跳到他在本 Issue 里的 Session）
+      // 左列：研发小队成员（含队长动态按需孵化的专职专家！）
       leftCol.innerHTML = `
         <div class="squad-pod">
           <div class="squad-pod-header">
             <span>🛠️ 研发小队 (${t.identifier})</span>
-            <span>3 人</span>
+            <span style="color:#4f46e5;cursor:pointer;" onclick="promptRecruitSpecialist()" title="无需预先配置，按需动态孵化专职组员">＋ 动态招募专家</span>
           </div>
           ${SQUAD_AGENTS.map(a => {
             const myRunsCount = runs.filter(r => r.agentId === a.id).length;
@@ -1383,9 +1383,58 @@
       renderSessionDrawer();
     }
 
-    // 实时同步后端 SQLite 中的每个 Issue 及其内部的 Runs
+    function promptRecruitSpecialist() {
+      const spec = prompt(
+        "【动态孵化专职组员 (SuperAgent 模式)】\n除了队长调用 nocturn dispatch/recruit 自动按需造人外，你也可以直接输入「专职ID:显示名:职责说明」当场孵化新专家：",
+        "sec-auditor:安全审计专家:专职负责 SQL/Shell 注入审计与边界压测"
+      );
+      if (!spec) return;
+      const parts = spec.split(":");
+      const id = (parts[0] || "specialist-" + Date.now()).trim();
+      const name = (parts[1] || id).trim();
+      const instructions = (parts[2] || "专职执行组员").trim();
+      if (!SQUAD_AGENTS.some(a => a.id === id)) {
+        SQUAD_AGENTS.push({
+          id,
+          name,
+          role: "动态专家",
+          isLeader: false,
+          model: "deepseek-v4.1-flash",
+          color: "#d97706",
+          initials: name.slice(0, 2).toUpperCase(),
+          dotClass: "blue"
+        });
+      }
+      fetch(`${API_BASE}/api/cli`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          command: "recruit",
+          args: { id, name, squad: "dev", instructions }
+        })
+      }).catch(() => {});
+      syncUI();
+    }
+
+    // 实时同步后端 SQLite 中的每个 Issue 及其内部的 Runs + 动态招募的专家
     function applyBackendSnapshot(snap) {
       if (!snap || !Array.isArray(snap.tasks) || snap.tasks.length === 0) return;
+      if (Array.isArray(snap.agents)) {
+        snap.agents.forEach(ag => {
+          if (ag.squadId === "dev" && !SQUAD_AGENTS.some(x => x.id === ag.id)) {
+            SQUAD_AGENTS.push({
+              id: ag.id,
+              name: ag.name || ag.id,
+              role: ag.role === "leader" ? "队长" : "动态专家",
+              isLeader: ag.role === "leader",
+              model: (ag.model || "deepseek-v4.1-flash").split("/").pop(),
+              color: "#d97706",
+              initials: (ag.name || ag.id).slice(0, 2).toUpperCase(),
+              dotClass: "blue"
+            });
+          }
+        });
+      }
       const stageNames = ["① 队长拆单 Session", "② pi-coder 编码实现 Session", "③ 队长转交审查 Session", "④ Reviewer 独立审查与结单 Session"];
       tasksData = snap.tasks.map(t => {
         const rawRuns = (snap.runs || []).filter(r => r.taskId === t.id);

@@ -46,11 +46,13 @@ ${wakeSection}${childrenSection}
 ${rosterLines}
 
 ## 你可执行的动作（在 bash 工具中执行一条即可结束回合）
-1. 委派给单个组员执行：
-   \`nocturn dispatch --task ${task.identifier} --to <组员ID> --order "<具体执行要求>"\`
-2. 拆分为多个并行子任务（Fan-out，所有子任务完成后会自动唤醒你汇总）：
+1. 委派给组员执行（支持直接填现有组员 ID；**若现有团队缺少对应专精角色，你也可以直接填一个全新的专职 ID 如 \`sec-auditor\` / \`svg-artist\`，系统会像 SuperAgent 一样当场自动孵化该新组员并派单，无需人类预先配置！**）：
+   \`nocturn dispatch --task ${task.identifier} --to <组员ID或新专职ID> --order "<具体执行要求>" --instructions "<可选：新专职组员的人设约束>"\`
+2. 自主招募/组建新的专职组员或新特种小队：
+   \`nocturn recruit --id <新专职ID> --name "<显示名称>" --squad ${squad.id} --skills "<技能列表>" --instructions "<专职人设>"\`
+3. 拆分为多个并行子任务（Fan-out，所有子任务完成后会自动唤醒你汇总）：
    \`nocturn fanout --parent ${task.identifier} --subtasks '[{"id":"${task.identifier}-1","title":"...","to":"pi-coder"}]'\`
-3. 若组员已上报 Verdict=ready 且你已完成最终核验，直接上报 ready 移交人类待审核：
+4. 若组员已上报 Verdict=ready 且你已完成最终核验，直接上报 ready：
    \`nocturn report --task ${task.identifier} --agent ${leader.id} --state ready --summary "<验收结论>"\`
 `;
 }
