@@ -67,7 +67,7 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       squadId: "dev",
       role: "leader",
       cli: "pi",
-      model: "Deepseek-V4.1-Flash/gemini-4-argon-high",
+      model: process.env.NOCTURN_LEADER_MODEL ?? "Deepseek-V4.1-Flash/gemini-4-argon-high",
       skills: ["dispatch", "handoff", "fanout"],
       instructions: "只负责派单与验收，派单后立即退出进程 (Stop after dispatching)。",
     });
@@ -77,7 +77,7 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       squadId: "dev",
       role: "worker",
       cli: "pi",
-      model: "Deepseek-V4.1-Flash/deepseek-v4.1-flash",
+      model: process.env.NOCTURN_WORKER_MODEL ?? "Deepseek-V4.1-Flash/deepseek-v4.1-flash",
       skills: ["fullstack", "worktree", "unit-test"],
       instructions: "在 sota 独立 Git Worktree 执行编码任务并通过 nocturn report 汇报。",
     });
@@ -87,7 +87,7 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       squadId: "dev",
       role: "worker",
       cli: "pi",
-      model: "zgca/deepseek-flash",
+      model: process.env.NOCTURN_WORKER_MODEL ?? "zgca/deepseek-flash",
       skills: ["review", "regression-test"],
       instructions: "审查 PR 并提交结构化 Verdict。",
     });
@@ -97,7 +97,7 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       squadId: "ops",
       role: "leader",
       cli: "pi",
-      model: "Deepseek-V4.1-Flash/gemini-4-argon-high",
+      model: process.env.NOCTURN_LEADER_MODEL ?? "Deepseek-V4.1-Flash/gemini-4-argon-high",
       skills: ["dispatch", "ops"],
       instructions: "协调压测与巡检任务。",
     });
@@ -107,7 +107,7 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       squadId: "ops",
       role: "worker",
       cli: "pi",
-      model: "zgca/deepseek-flash",
+      model: process.env.NOCTURN_WORKER_MODEL ?? "zgca/deepseek-flash",
       skills: ["benchmark"],
       instructions: "在 sota 节点执行长会话稳定性压测。",
     });
