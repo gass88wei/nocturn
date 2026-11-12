@@ -148,7 +148,8 @@ export function createNocturnServer(dbPath = join(__dirname, "../../.nocturn.sql
       const url = new URL(req.url ?? "/", "http://localhost");
 
       if (req.method === "GET" && url.pathname === "/") {
-        const html = readFileSync(join(__dirname, "../ui/index.html"), "utf8");
+        // Packaged binaries embed the UI and point NOCTURN_UI at it; source runs use the repo path.
+        const html = readFileSync(process.env.NOCTURN_UI ?? join(__dirname, "../ui/index.html"), "utf8");
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(html);
         return;
@@ -448,7 +449,10 @@ print(json.dumps({"worktreePath": wdir, "gitBranch": git_branch, "gitCommit": gi
   return { server, store, engine, runner };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Packaged binaries import this module for createNocturnServer; in the compiled bundle every
+// module's virtual path collapses onto argv[1], so this guard would fire on import and try to
+// open the default DB inside the read-only embedded filesystem. NOCTURN_SKIP_AUTOSTART opt-out.
+if (import.meta.url === `file://${process.argv[1]}` && !process.env.NOCTURN_SKIP_AUTOSTART) {
   const port = Number(process.env.PORT ?? 4100);
   const { server } = createNocturnServer();
   server.listen(port, () => {
