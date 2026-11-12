@@ -26,19 +26,41 @@ jobs:
       - name: Build standalone binary (linux-x64)
         run: bun build --compile --target=bun-linux-x64 bin/nocturn-standalone.ts --outfile nocturn-linux-x64
 
-      - name: Smoke test
+      - name: Smoke test (launch binary, fail on GLIBC or CXXABI errors)
         run: |
+          ldd nocturn-linux-x64 > ldd.out 2>&1 || true
+          if grep -qE "not found" ldd.out; then
+            echo "missing shared libraries:"
+            cat ldd.out
+            exit 1
+          fi
           PORT=14120 NOCTURN_DB="$PWD/smoke.sqlite" ./nocturn-linux-x64 > smoke.log 2>&1 &
           pid=$!
           ok=0
           for i in $(seq 1 20); do
-            if curl -sf http://127.0.0.1:14120/ -o page.html; then ok=1; break; fi
+            if curl -sf http://127.0.0.1:14120/ -o page.html; then
+              ok=1
+              break
+            fi
             sleep 0.5
           done
           kill "$pid" 2>/dev/null || true
-          [ "$ok" = 1 ] || { cat smoke.log; exit 1; }
-          grep -qi nocturn page.html || { echo "UI marker missing"; cat smoke.log; exit 1; }
-          echo "smoke OK"
+          if [ "$ok" != "1" ]; then
+            echo "binary failed to launch:"
+            cat smoke.log
+            exit 1
+          fi
+          if grep -qE "GLIBC_|CXXABI_" smoke.log; then
+            echo "runtime symbol version errors:"
+            cat smoke.log
+            exit 1
+          fi
+          grep -qi nocturn page.html
+          if [ $? != "0" ]; then
+            echo "UI marker missing"
+            exit 1
+          fi
+          echo "smoke OK: binary launched and served the web UI"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -61,10 +83,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           chmod +x nocturn-linux-x64
-          gh release create "$GITHUB_REF_NAME" nocturn-linux-x64 \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "nocturn $GITHUB_REF_NAME" \
-            --notes "Standalone Linux x64 binary (built on ubuntu-22.04, glibc 2.35).
-- Run: chmod +x nocturn-linux-x64 && ./nocturn-linux-x64
-- Web UI: http://localhost:4100 (override with PORT)
-- Database: ~/.nocturn/nocturn.sqlite (override with NOCTURN_DB)"
+          printf 'Standalone Linux x64 binary (built on ubuntu-22.04, glibc 2.35).\n\n- Run: chmod +x nocturn-linux-x64 && ./nocturn-linux-x64\n- Web UI: http://localhost:4100 (override with PORT)\n- Database: ~/.nocturn/nocturn.sqlite (override with NOCTURN_DB)\n' > release-notes.md
+          gh release create "$GITHUB_REF_NAME" nocturn-linux-x64 --repo "$GITHUB_REPOSITORY" --title "nocturn $GITHUB_REF_NAME" --notes-file release-notes.md
