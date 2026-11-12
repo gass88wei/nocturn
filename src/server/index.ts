@@ -247,7 +247,7 @@ print(json.dumps({"worktreePath": wdir, "gitBranch": git_branch, "gitCommit": gi
           squadId: body.squadId ? String(body.squadId) : "dev",
           role: (body.role as Agent["role"]) ?? "worker",
           cli: (body.cli as Agent["cli"]) ?? "pi",
-          model: String(body.model ?? "Deepseek-V4.1-Flash/deepseek-v4.1-flash"),
+          model: String(body.model ?? process.env.NOCTURN_WORKER_MODEL ?? "Deepseek-V4.1-Flash/deepseek-v4.1-flash"),
           skills: Array.isArray(body.skills) ? body.skills.map(String) : ["coding"],
           instructions: String(body.instructions ?? ""),
         });
@@ -377,8 +377,9 @@ print(json.dumps({"worktreePath": wdir, "gitBranch": git_branch, "gitCommit": gi
 
       if (req.method === "POST" && url.pathname === "/api/sweep") {
         const reclaimed = engine.sweepStaleRuns();
+        const memories = engine.consolidateMemories();
         await runner.processPendingEffects();
-        sendJson(res, 200, { reclaimedCount: reclaimed.length, reclaimed });
+        sendJson(res, 200, { reclaimedCount: reclaimed.length, reclaimed, memories });
         return;
       }
 
@@ -423,6 +424,7 @@ print(json.dumps({"worktreePath": wdir, "gitBranch": git_branch, "gitCommit": gi
 
         const sotaRes = await runner.runLiveOnSota({
           runId: activeRunId,
+          agentId,
           worktreePath: refreshedSession.worktreePath,
           piSessionId: refreshedSession.piSessionId!,
           model: chosenModel,
@@ -455,7 +457,7 @@ print(json.dumps({"worktreePath": wdir, "gitBranch": git_branch, "gitCommit": gi
 if (import.meta.url === `file://${process.argv[1]}` && !process.env.NOCTURN_SKIP_AUTOSTART) {
   const port = Number(process.env.PORT ?? 4100);
   const { server } = createNocturnServer();
-  server.listen(port, () => {
-    console.log(`Nocturn Server running on http://localhost:${port}`);
+  server.listen(port, "127.0.0.1", () => {
+    console.log(`Nocturn Server running on http://127.0.0.1:${port}`);
   });
 }

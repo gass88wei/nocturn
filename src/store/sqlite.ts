@@ -4,6 +4,7 @@ import type {
   AgentRun,
   AgentSession,
   ExternalTrigger,
+  MemoryEntry,
   Squad,
   Task,
   TaskInput,
@@ -86,6 +87,11 @@ export class NocturnStore {
         attempts INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'pending',
         updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS memories (
+        id TEXT PRIMARY KEY,
+        scope TEXT NOT NULL,
+        data TEXT NOT NULL
       );
     `);
   }
@@ -307,5 +313,27 @@ export class NocturnStore {
     this.db
       .prepare("UPDATE effects SET status = 'done', updated_at = ? WHERE id = ?")
       .run(new Date().toISOString(), id);
+  }
+
+  saveMemory(memory: MemoryEntry): void {
+    this.db
+      .prepare("INSERT OR REPLACE INTO memories (id, scope, data) VALUES (?, ?, ?)")
+      .run(memory.id, memory.scope, JSON.stringify(memory));
+  }
+
+  getMemory(id: string): MemoryEntry | undefined {
+    const row = this.db.prepare("SELECT data FROM memories WHERE id = ?").get(id) as
+      | { data: string }
+      | undefined;
+    return row ? (JSON.parse(row.data) as MemoryEntry) : undefined;
+  }
+
+  listAllMemories(): MemoryEntry[] {
+    const rows = this.db.prepare("SELECT data FROM memories").all() as Array<{ data: string }>;
+    return rows.map((r) => JSON.parse(r.data) as MemoryEntry);
+  }
+
+  deleteMemory(id: string): void {
+    this.db.prepare("DELETE FROM memories WHERE id = ?").run(id);
   }
 }

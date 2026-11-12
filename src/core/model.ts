@@ -168,3 +168,23 @@ export interface ExternalTrigger {
   handedBackByTaskId?: string | null;
   handbackReason?: string | null;
 }
+
+/**
+ * Memory entry (agent experience store):
+ * - scope: "shared" (cross-agent pool; written by leaders/reviewers or explicitly)
+ *          or "agent:<id>" (per-agent private pool)
+ * - kind:  "lesson" (failure/blocked root cause worth remembering) or
+ *          "delivery" (completed-work summary worth reusing)
+ */
+export interface MemoryEntry {
+  id: string;
+  scope: "shared" | `agent:${string}`;
+  kind: "lesson" | "delivery";
+  content: string;
+  tags: string[];
+  sourceTaskId?: string;
+  sourceAgentId?: string;
+  createdAt: string;
+  lastUsedAt: string;
+  hits: number;
+}

@@ -7,6 +7,7 @@
  * 3. `nocturn dispatch` — Squad Leader delegates a Task to a Worker and immediately exits its pulse turn
  * 4. `nocturn fanout`   — Squad Leader splits a parent Task into parallel subtasks with an AND Join Gate
  * 5. `nocturn note`     — Squad Leader sends a context-only note to a running Worker Session
+ * 6. `nocturn memory`   — Agent experience store: write/search/list personal & shared memories
  */
 import type { NocturnEngine } from "../core/engine.ts";
 import type { RiskLevel, VerdictState } from "../core/model.ts";
@@ -17,7 +18,8 @@ export type NocturnCliCommand =
   | "dispatch"
   | "fanout"
   | "note"
-  | "recruit";
+  | "recruit"
+  | "memory";
 
 export function executeAgentCliCommand(
   engine: NocturnEngine,
@@ -115,6 +117,35 @@ export function executeAgentCliCommand(
         mode: "note",
         text: String(args.text ?? ""),
       });
+    }
+
+    case "memory": {
+      const action = String(args.action ?? "search");
+      if (action === "write") {
+        const content = String(args.text ?? args.content ?? "").trim();
+        if (!content) throw new Error("memory write requires --text \"<经验内容>\"");
+        return engine.addMemory({
+          scope: args.scope === "shared" ? "shared" : `agent:${String(args.agent ?? "unknown")}`,
+          kind: args.kind === "delivery" ? "delivery" : "lesson",
+          content,
+          tags: args.tags
+            ? String(args.tags)
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+            : [],
+          sourceAgentId: args.agent ? String(args.agent) : undefined,
+        });
+      }
+      if (action === "list") {
+        const memories = engine.listMemories();
+        return args.scope ? memories.filter((m) => m.scope === String(args.scope)) : memories;
+      }
+      return engine.relevantMemories(
+        String(args.q ?? args.query ?? ""),
+        String(args.agent ?? "unknown"),
+        Number(args.limit ?? 5)
+      );
     }
   }
 }

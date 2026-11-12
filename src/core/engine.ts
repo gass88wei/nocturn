@@ -5,6 +5,7 @@ import type {
   AttentionRequest,
   ExternalTrigger,
   InputDeliveryMode,
+  MemoryEntry,
   RiskLevel,
   RunTraceStep,
   Task,
@@ -15,6 +16,22 @@ import { NocturnStore } from "../store/sqlite.ts";
 
 function uid(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/**
+ * Tokenize text for memory retrieval scoring: latin/digit words plus CJK character
+ * bigrams (so Chinese phrases overlap without any FTS dependency).
+ */
+function tokenize(text: string): Set<string> {
+  const tokens = new Set<string>();
+  const normalized = text.toLowerCase();
+  for (const word of normalized.split(/[^a-z0-9_]+/)) {
+    if (word.length >= 2) tokens.add(word);
+  }
+  for (const run of normalized.match(/[\u4e00-\u9fff]+/g) ?? []) {
+    for (let i = 0; i < run.length - 1; i++) tokens.add(run.slice(i, i + 2));
+  }
+  return tokens;
 }
 
 /**
@@ -196,8 +213,8 @@ export class NocturnEngine {
       const model =
         params.model ??
         (role === "leader"
-          ? "Deepseek-V4.1-Flash/gemini-4-argon-high"
-          : "Deepseek-V4.1-Flash/deepseek-v4.1-flash");
+          ? (process.env.NOCTURN_LEADER_MODEL ?? "Deepseek-V4.1-Flash/gemini-4-argon-high")
+          : (process.env.NOCTURN_WORKER_MODEL ?? "Deepseek-V4.1-Flash/deepseek-v4.1-flash"));
 
       const agent: Agent = {
         id: params.agentId,
@@ -633,6 +650,24 @@ export class NocturnEngine {
         });
       }
 
+      // Memory hook: delivery summaries & failure lessons auto-store on terminal verdicts.
+      // Quality gate: leaders/reviewers write into the shared pool; workers stay personal.
+      if (params.state === "ready" || params.state === "failed") {
+        const reporter = this.store.getAgent(params.agentId);
+        const isSupervisor =
+          reporter?.role === "leader" ||
+          reporter?.role === "chief" ||
+          params.agentId === "codex-reviewer";
+        this.addMemory({
+          scope: isSupervisor ? "shared" : `agent:${params.agentId}`,
+          kind: params.state === "ready" ? "delivery" : "lesson",
+          content: `${task.identifier} (${task.title}): ${params.summary}`,
+          tags: [task.identifier, params.state],
+          sourceTaskId: task.id,
+          sourceAgentId: params.agentId,
+        });
+      }
+
       task.updatedAt = now;
       this.store.saveTask(task);
       this.notifyChange();
@@ -807,6 +842,162 @@ export class NocturnEngine {
         }
       }
       return reclaimed;
+    });
+  }
+
+  /**
+   * Persist a memory entry (agent experience store). Consolidation piggybacks on writes:
+   * every 25th entry triggers a dedupe/merge/expire pass over the pool.
+   */
+  addMemory(params: {
+    scope: MemoryEntry["scope"];
+    kind: MemoryEntry["kind"];
+    content: string;
+    tags?: string[];
+    sourceTaskId?: string;
+    sourceAgentId?: string;
+  }): MemoryEntry {
+    return this.store.atomic(() => {
+      const now = new Date().toISOString();
+      const memory: MemoryEntry = {
+        id: uid("mem"),
+        scope: params.scope,
+        kind: params.kind,
+        content: params.content,
+        tags: params.tags ?? [],
+        sourceTaskId: params.sourceTaskId,
+        sourceAgentId: params.sourceAgentId,
+        createdAt: now,
+        lastUsedAt: now,
+        hits: 0,
+      };
+      this.store.saveMemory(memory);
+      if (this.store.listAllMemories().length % 25 === 0) {
+        this.consolidateMemories();
+      }
+      this.notifyChange();
+      return memory;
+    });
+  }
+
+  listMemories(): MemoryEntry[] {
+    return this.store.listAllMemories();
+  }
+
+  /**
+   * Score-based memory retrieval for briefing injection & CLI search (no FTS dependency):
+   * keyword overlap on content + tag hits + recency bonus + usage hits, over the shared
+   * pool and the agent's private pool. Retrieved entries get their `hits` incremented.
+   */
+  relevantMemories(query: string, agentId: string, k = 5): MemoryEntry[] {
+    const queryTokens = tokenize(query);
+    const loweredQuery = query.toLowerCase();
+    const nowMs = Date.now();
+    const scored = this.store
+      .listAllMemories()
+      .filter((m) => m.scope === "shared" || m.scope === `agent:${agentId}`)
+      .map((m) => {
+        let score = 0;
+        const memoryTokens = tokenize(m.content);
+        for (const token of queryTokens) {
+          if (memoryTokens.has(token)) score += 2;
+        }
+        for (const tag of m.tags) {
+          if (tag && loweredQuery.includes(tag.toLowerCase())) score += 3;
+        }
+        score += Math.min(m.hits, 5);
+        const ageDays = Math.max(0, (nowMs - Date.parse(m.createdAt)) / 86400000);
+        score += Math.max(0, 2 - ageDays / 7);
+        return { memory: m, score };
+      })
+      .filter((s) => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, k);
+
+    if (scored.length > 0) {
+      this.store.atomic(() => {
+        const now = new Date().toISOString();
+        for (const s of scored) {
+          s.memory.hits += 1;
+          s.memory.lastUsedAt = now;
+          this.store.saveMemory(s.memory);
+        }
+      });
+    }
+    return scored.map((s) => s.memory);
+  }
+
+  /**
+   * Memory housekeeping (piggybacked on every 25th write + POST /api/sweep):
+   * merge near-duplicate entries in the same scope, drop zero-hit `delivery` entries
+   * older than 14 days (lessons are kept), and cap each scope at 200 entries.
+   */
+  consolidateMemories(nowIso = new Date().toISOString()): { merged: number; dropped: number } {
+    return this.store.atomic(() => {
+      let merged = 0;
+      let dropped = 0;
+      const byScope = new Map<string, MemoryEntry[]>();
+      for (const memory of this.store.listAllMemories()) {
+        const list = byScope.get(memory.scope) ?? [];
+        list.push(memory);
+        byScope.set(memory.scope, list);
+      }
+
+      const MEMORY_DUP_THRESHOLD = 0.6;
+      const MEMORY_STALE_DELIVERY_DAYS = 14;
+      const MEMORY_SCOPE_CAP = 200;
+
+      for (const [scope, list] of byScope) {
+        const kept: MemoryEntry[] = [];
+        for (const memory of list) {
+          const tokens = tokenize(memory.content);
+          const twin = kept.find(
+            (candidate) =>
+              candidate.kind === memory.kind &&
+              (() => {
+                const candidateTokens = tokenize(candidate.content);
+                const overlap = [...candidateTokens].filter((t) => tokens.has(t)).length;
+                const smaller = Math.min(candidateTokens.size, tokens.size) || 1;
+                return overlap / smaller >= MEMORY_DUP_THRESHOLD;
+              })()
+          );
+          if (twin) {
+            twin.hits += memory.hits;
+            twin.tags = [...new Set([...twin.tags, ...memory.tags])];
+            if (memory.lastUsedAt > twin.lastUsedAt) twin.lastUsedAt = memory.lastUsedAt;
+            if (memory.createdAt < twin.createdAt) twin.createdAt = memory.createdAt;
+            this.store.saveMemory(twin);
+            this.store.deleteMemory(memory.id);
+            merged++;
+          } else {
+            kept.push(memory);
+          }
+        }
+
+        for (const memory of kept) {
+          const ageDays = (Date.parse(nowIso) - Date.parse(memory.createdAt)) / 86400000;
+          if (memory.kind === "delivery" && memory.hits === 0 && ageDays > MEMORY_STALE_DELIVERY_DAYS) {
+            this.store.deleteMemory(memory.id);
+            dropped++;
+          }
+        }
+
+        const survivors = this.store
+          .listAllMemories()
+          .filter((m) => m.scope === scope);
+        if (survivors.length > MEMORY_SCOPE_CAP) {
+          survivors
+            .sort((a, b) => a.hits - b.hits || a.lastUsedAt.localeCompare(b.lastUsedAt))
+            .slice(0, survivors.length - MEMORY_SCOPE_CAP)
+            .forEach((m) => {
+              this.store.deleteMemory(m.id);
+              dropped++;
+            });
+        }
+      }
+
+      this.notifyChange();
+      return { merged, dropped };
     });
   }
 

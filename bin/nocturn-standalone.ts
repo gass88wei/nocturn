@@ -25,6 +25,6 @@ mkdirSync(dirname(dbPath), { recursive: true });
 const port = Number(process.env.PORT ?? 4100);
 const { createNocturnServer } = await import("../src/server/index.ts");
 const { server } = createNocturnServer(dbPath);
-server.listen(port, () => {
-  console.log(`Nocturn Server running on http://localhost:${port}`);
+server.listen(port, "127.0.0.1", () => {
+  console.log(`Nocturn Server running on http://127.0.0.1:${port}`);
 });

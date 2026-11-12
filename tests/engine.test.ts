@@ -480,4 +480,119 @@ describe("Nocturn Core Engine & Distilled Mechanisms", () => {
     assert.ok(newSquad, "New squad 'perf-squad' dynamically created without manual pre-configuration");
     assert.ok(newSquad!.memberIds.includes("perf-profiler"));
   });
+
+  it("Memory System: CLI write/search, briefing injection, verdict auto-store, and consolidation dedupe", () => {
+    const { store, engine, runner } = setupSeededEngine();
+
+    // 1. Manual shared-pool write via CLI (quality gate: leaders/reviewers write shared)
+    executeAgentCliCommand(engine, "memory", {
+      action: "write",
+      agent: "dev-leader",
+      scope: "shared",
+      kind: "lesson",
+      text: "yangxin 仓库必须先跑 pytest 再跑 eslint，否则验收必失败",
+      tags: "yangxin,pytest",
+    });
+    assert.equal(engine.listMemories().length, 1);
+
+    // 2. Briefing injection: a task mentioning the same keywords picks up the shared lesson
+    const task = engine.createTask({
+      identifier: "TASK-901",
+      title: "修复 yangxin 模块 pytest 失败",
+      squadId: "dev",
+    });
+    engine.dispatchTask({
+      taskId: task.id,
+      workerAgentId: "pi-coder",
+      orderText: "在 worktree 里修复 yangxin pytest 失败的用例",
+    });
+    const workerBriefing = runner.buildBriefingForTaskAgent(task.id, "pi-coder", "执行队长委派");
+    assert.ok(workerBriefing.includes("## 相关记忆"), "worker briefing carries a memory section");
+    assert.ok(workerBriefing.includes("pytest"), "relevant shared memory is injected into the briefing");
+    const retrieved = engine.listMemories().find((m) => m.content.includes("pytest"))!;
+    assert.ok(retrieved.hits >= 1, "retrieved memory gets its hit counter incremented");
+
+    // 3. Verdict auto-store: worker ready -> personal delivery; (reviewer/leader would go shared)
+    engine.reportVerdict({
+      taskId: task.id,
+      agentId: "pi-coder",
+      state: "ready",
+      summary: "修复完成，全部 pytest 用例通过",
+    });
+    assert.ok(
+      engine.listMemories().some((m) => m.scope === "agent:pi-coder" && m.kind === "delivery"),
+      "worker ready verdict stores a personal delivery memory"
+    );
+
+    // 4. Failure lesson auto-store (worker -> personal scope)
+    engine.reportVerdict({
+      taskId: task.id,
+      agentId: "pi-coder",
+      state: "failed",
+      summary: "依赖版本冲突导致构建失败",
+    });
+    assert.ok(engine.listMemories().some((m) => m.kind === "lesson"), "failed verdict stores a lesson");
+
+    // 5. Consolidation merges near-duplicate lessons in the same scope
+    engine.addMemory({ scope: "shared", kind: "lesson", content: "always run pytest before eslint in yangxin repo", tags: ["pytest"] });
+    engine.addMemory({ scope: "shared", kind: "lesson", content: "always run pytest before eslint in yangxin repo!", tags: ["eslint"] });
+    const before = engine.listMemories().length;
+    const result = engine.consolidateMemories();
+    assert.ok(result.merged >= 1, "near-duplicate memories merged");
+    assert.ok(engine.listMemories().length < before);
+    assert.ok(
+      store.listAllMemories().every((m) => m.scope === "shared" || m.scope.startsWith("agent:")),
+      "all memory rows carry a valid scope"
+    );
+  });
+
+  it("Per-agent PI_CODING_AGENT_DIR: local & SSH commands target the agent's own pi config dir, and resolveAgentModel honors agent.model", () => {
+    const { store, engine } = setupSeededEngine();
+    const localRunner = new SotaPiRunner(engine, {
+      dryRun: true,
+      execMode: "local",
+      baseDir: "/tmp/nocturn-test",
+    });
+    const localCmd = localRunner.buildSotaPiCommand({
+      worktreePath: "/tmp/nocturn-test/worktrees/task-901",
+      piSessionId: "sess-1",
+      prompt: "p",
+      agentId: "pi-coder",
+    });
+    assert.equal(localCmd.bin, "sh");
+    assert.ok(
+      localCmd.args[localCmd.args.length - 1].includes(
+        "PI_CODING_AGENT_DIR=/tmp/nocturn-test/.pi/agents/pi-coder"
+      ),
+      "local mode points PI_CODING_AGENT_DIR at the agent's own dir"
+    );
+
+    const sshRunner = new SotaPiRunner(engine, {
+      dryRun: true,
+      execMode: "ssh",
+      baseDir: "/home/qijinyin/multimodal/yangxin/nocturn",
+      sshHost: "root@example",
+      sshPort: 10780,
+      sshControlSocket: "",
+    });
+    const sshCmd = sshRunner.buildSotaPiCommand({
+      worktreePath: "/home/qijinyin/multimodal/yangxin/nocturn/worktrees/task-901",
+      piSessionId: "sess-1",
+      prompt: "p",
+      agentId: "codex-reviewer",
+    });
+    assert.equal(sshCmd.bin, "ssh");
+    assert.ok(
+      sshCmd.args[sshCmd.args.length - 1].includes(
+        "PI_CODING_AGENT_DIR=/home/qijinyin/multimodal/yangxin/nocturn/.pi/agents/codex-reviewer"
+      ),
+      "ssh mode points PI_CODING_AGENT_DIR at the agent's own dir"
+    );
+
+    // Model routing honors the agent's configured model (real provider ids, no hardcoded filtering)
+    const coder = store.getAgent("pi-coder")!;
+    coder.model = "relay/glm-4.7";
+    store.saveAgent(coder);
+    assert.equal(localRunner.resolveAgentModel("pi-coder"), "relay/glm-4.7");
+  });
 });

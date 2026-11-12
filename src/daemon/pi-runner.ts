@@ -1,7 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import type { NocturnEngine } from "../core/engine.ts";
+import type { MemoryEntry } from "../core/model.ts";
 import { buildLeaderBriefing, buildWorkerBriefing } from "../core/briefing.ts";
 
 export const SOTA_BASE_DIR =
@@ -40,18 +41,16 @@ export class SotaPiRunner {
 
   /**
    * Resolve the model for an Agent:
-   * - Leaders always use `Deepseek-V4.1-Flash/gemini-4-argon-high`
-   * - Workers mix `Deepseek-V4.1-Flash/deepseek-v4.1-flash` and `zgca/deepseek-flash`
+   * - Leaders always use `NOCTURN_LEADER_MODEL` (env-overridable, defaults to the legacy placeholder)
+   * - Workers use their own configured model (seed agents are upserted to real ids at setup);
+   *   only agents without any model round-robin over WORKER_MODELS
    */
   resolveAgentModel(agentId: string): string {
     const agent = this.engine.store.getAgent(agentId);
     if (!agent || agent.role === "leader" || agent.role === "chief") {
       return LEADER_MODEL;
     }
-    if (
-      agent.model &&
-      (agent.model.includes("deepseek-v4.1-flash") || agent.model.includes("zgca/deepseek-flash"))
-    ) {
+    if (agent.model) {
       return agent.model;
     }
     const chosen = WORKER_MODELS[this.workerModelIndex % WORKER_MODELS.length];
@@ -116,6 +115,50 @@ export class SotaPiRunner {
   }
 
   /**
+   * Ensure the agent's dedicated pi config dir (PI_CODING_AGENT_DIR) exists and is seeded:
+   * AGENTS.md from the agent's instructions/skills, plus shared models.json when present.
+   * Per-agent dirs give every agent its own skills/tools/context (user-editable).
+   */
+  private ensureAgentRuntimeDir(agentId: string): string {
+    const safeAgentId = agentId.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const agentDir = `${this.options.baseDir}/.pi/agents/${safeAgentId}`;
+    try {
+      mkdirSync(agentDir, { recursive: true });
+      const agent = this.engine.store.getAgent(agentId);
+      const agentsMd = `${agentDir}/AGENTS.md`;
+      if (agent && !existsSync(agentsMd)) {
+        writeFileSync(
+          agentsMd,
+          [
+            `# ${agent.name} (${agent.id})`,
+            "",
+            `- 角色: ${agent.role}`,
+            `- 专属技能: ${agent.skills.join(", ")}`,
+            `- 模型: ${agent.model || "(round-robin)"}`,
+            "",
+            "## 职责",
+            agent.instructions,
+            "",
+            "## 专属配置目录说明",
+            `本目录 (${agentDir}) 是你在 pi CLI 下的专属配置目录 (PI_CODING_AGENT_DIR)。`,
+            "可在此放置你专属的技能扩展、MCP 工具配置等；models.json 为共享模型路由配置的副本。",
+            "",
+          ].join("\n")
+        );
+      }
+      const sharedDir = `${this.options.baseDir}/.pi/shared`;
+      const sharedModels = `${sharedDir}/models.json`;
+      const agentModels = `${agentDir}/models.json`;
+      if (existsSync(sharedModels) && !existsSync(agentModels)) {
+        copyFileSync(sharedModels, agentModels);
+      }
+    } catch {
+      // Best-effort seeding only: never block a Run on config-dir setup problems.
+    }
+    return agentDir;
+  }
+
+  /**
    * Build the exact command that invokes `pi` (on `sota` via SSH or locally) for a given Session & prompt.
    */
   buildSotaPiCommand(params: {
@@ -123,15 +166,19 @@ export class SotaPiRunner {
     piSessionId: string;
     model?: string;
     prompt: string;
+    agentId?: string;
   }): { bin: string; args: string[]; model: string } {
     const model = params.model ?? LEADER_MODEL;
     const escapedPrompt = params.prompt.replace(/'/g, `'\\''`);
     const baseDir = this.options.baseDir;
     const piBin = this.options.execMode === "local" ? "pi" : `${baseDir}/bin/pi`;
+    const agentDir = params.agentId
+      ? `${baseDir}/.pi/agents/${params.agentId.replace(/[^a-zA-Z0-9_-]/g, "_")}`
+      : `${baseDir}/.pi/agent`;
     const envExport =
       this.options.execMode === "local"
-        ? `export PATH=${baseDir}/bin:$PATH`
-        : `export HOME=${baseDir} PI_CODING_AGENT_DIR=${baseDir}/.pi/agent TMPDIR=${baseDir}/tmp PATH=${baseDir}/bin:$PATH`;
+        ? `export PATH=${baseDir}/bin:$PATH PI_CODING_AGENT_DIR=${agentDir}`
+        : `export HOME=${baseDir} PI_CODING_AGENT_DIR=${agentDir} TMPDIR=${baseDir}/tmp PATH=${baseDir}/bin:$PATH`;
     const gitInit = this.buildGitWorktreeInitCmd(params.worktreePath);
     const fullCmd = `${envExport} && mkdir -p ${baseDir}/sessions ${baseDir}/tmp && ${gitInit} && cd ${params.worktreePath} && ${piBin} --mode json --session-dir ${baseDir}/sessions --model ${model} --session-id ${params.piSessionId} -p '${escapedPrompt}'`;
 
@@ -145,12 +192,26 @@ export class SotaPiRunner {
 
   /**
    * Build the full role-aware briefing prompt (Leader vs Worker) for a Task & Agent.
+   * Memories default to a relevance retrieval over the shared pool + the agent's private pool.
    */
-  buildBriefingForTaskAgent(taskId: string, agentId: string, wakeReason?: string): string {
+  buildBriefingForTaskAgent(
+    taskId: string,
+    agentId: string,
+    wakeReason?: string,
+    memories?: MemoryEntry[]
+  ): string {
     const store = this.engine.store;
     const task = store.getTask(taskId);
     const agent = store.getAgent(agentId);
     if (!task || !agent) return wakeReason ?? "请继续推进当前任务。";
+
+    const relevantMemories =
+      memories ??
+      this.engine.relevantMemories(
+        `${task.identifier} ${task.title} ${task.description || ""} ${wakeReason ?? ""}`,
+        agent.id,
+        5
+      );
 
     if (agent.role === "leader" || agent.role === "chief") {
       const squad = store.listSquads().find((s) => s.id === task.squadId) ?? store.listSquads()[0];
@@ -163,6 +224,7 @@ export class SotaPiRunner {
         members,
         childTasks,
         wakeReason,
+        memories: relevantMemories,
       });
     }
 
@@ -174,6 +236,7 @@ export class SotaPiRunner {
       worker: agent,
       orderText: task.description || task.title,
       unreadInputs,
+      memories: relevantMemories,
     });
   }
 
@@ -268,16 +331,29 @@ export class SotaPiRunner {
       this.engine.bindNativePiSessionId(session.id, randomUUID());
     }
     const refreshed = this.engine.store.getSession(session.id)!;
+    const task = this.engine.store.getTask(run.taskId);
     const model = this.resolveAgentModel(run.agentId);
-    const prompt = this.buildBriefingForTaskAgent(run.taskId, run.agentId, run.summary);
+    const memories = task
+      ? this.engine.relevantMemories(
+          `${task.identifier} ${task.title} ${task.description || ""} ${run.summary}`,
+          run.agentId,
+          5
+        )
+      : [];
     this.engine.appendRunStep(run.id, {
       badge: "步骤",
       text: `[模型路由] ${run.agentId} 使用模型 ${model}`,
     });
+    this.engine.appendRunStep(run.id, {
+      badge: "步骤",
+      text: `[记忆注入] ${memories.length} 条相关记忆 (scope=shared + agent:${run.agentId})`,
+    });
+    const prompt = this.buildBriefingForTaskAgent(run.taskId, run.agentId, run.summary, memories);
 
     try {
       await this.runLiveOnSota({
         runId: run.id,
+        agentId: run.agentId,
         worktreePath: refreshed.worktreePath,
         piSessionId: refreshed.piSessionId!,
         model,
@@ -310,11 +386,15 @@ export class SotaPiRunner {
    */
   runLiveOnSota(params: {
     runId?: string;
+    agentId?: string;
     worktreePath: string;
     piSessionId: string;
     model?: string;
     prompt: string;
   }): Promise<{ code: number | null; assistantText: string; model: string; rawLines: string[] }> {
+    if (params.agentId) {
+      this.ensureAgentRuntimeDir(params.agentId);
+    }
     const { bin, args, model } = this.buildSotaPiCommand(params);
     return new Promise((resolve, reject) => {
       const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });

@@ -1,4 +1,4 @@
-import type { Agent, Squad, Task, TaskInput } from "./model.ts";
+import type { Agent, MemoryEntry, Squad, Task, TaskInput } from "./model.ts";
 
 /**
  * Briefing & Prompt Context Builder
@@ -6,6 +6,21 @@ import type { Agent, Squad, Task, TaskInput } from "./model.ts";
  * Mirrors Multica's `squad_briefing.go` + DeepSeek SuperAgent's `orchestrator.md` & `worker.md`:
  * Assembles deterministic role-aware prompts for Squad Leaders and Workers on `sota`.
  */
+function buildMemoriesSection(memories?: MemoryEntry[]): string {
+  if (!memories || memories.length === 0) return "";
+  return (
+    `\n## 相关记忆 (往期经验，优先参考，避免重复踩坑)\n` +
+    memories
+      .map((m) => {
+        const kindLabel = m.kind === "lesson" ? "教训" : "交付";
+        const tags = m.tags.length > 0 ? ` (标签: ${m.tags.join(",")})` : "";
+        return `- [${kindLabel}] ${m.content}${tags}`;
+      })
+      .join("\n") +
+    "\n"
+  );
+}
+
 export function buildLeaderBriefing(params: {
   task: Task;
   squad: Squad;
@@ -13,8 +28,9 @@ export function buildLeaderBriefing(params: {
   members: Agent[];
   childTasks: Task[];
   wakeReason?: string;
+  memories?: MemoryEntry[];
 }): string {
-  const { task, squad, leader, members, childTasks, wakeReason } = params;
+  const { task, squad, leader, members, childTasks, wakeReason, memories } = params;
   const workers = members.filter((m) => m.id !== leader.id);
   const rosterLines = workers
     .map((w) => `- ${w.id} (${w.name}): 技能=[${w.skills.join(", ")}] · 职责=${w.instructions}`)
@@ -41,7 +57,7 @@ export function buildLeaderBriefing(params: {
 - 标题：${task.title}
 - 描述：${task.description || "无补充描述"}
 - 当前状态：${task.status}
-${wakeSection}${childrenSection}
+${wakeSection}${childrenSection}${buildMemoriesSection(memories)}
 ## 小队可用执行组员
 ${rosterLines}
 
@@ -52,7 +68,9 @@ ${rosterLines}
    \`nocturn recruit --id <新专职ID> --name "<显示名称>" --squad ${squad.id} --skills "<技能列表>" --instructions "<专职人设>"\`
 3. 拆分为多个并行子任务（Fan-out，所有子任务完成后会自动唤醒你汇总）：
    \`nocturn fanout --parent ${task.identifier} --subtasks '[{"id":"${task.identifier}-1","title":"...","to":"pi-coder"}]'\`
-4. 若组员已上报 Verdict=ready 且你已完成最终核验，直接上报 ready：
+4. 查询/沉淀经验记忆（派单前可先检索往期教训）：
+   \`nocturn memory search --agent ${leader.id} --q "<关键词>"\` / \`nocturn memory write --agent ${leader.id} --scope shared --kind lesson --text "<经验>" --tags "标签1,标签2"\`
+5. 若组员已上报 Verdict=ready 且你已完成最终核验，直接上报 ready：
    \`nocturn report --task ${task.identifier} --agent ${leader.id} --state ready --summary "<验收结论>"\`
 `;
 }
@@ -62,8 +80,9 @@ export function buildWorkerBriefing(params: {
   worker: Agent;
   orderText: string;
   unreadInputs: TaskInput[];
+  memories?: MemoryEntry[];
 }): string {
-  const { task, worker, orderText, unreadInputs } = params;
+  const { task, worker, orderText, unreadInputs, memories } = params;
   const inputsSection =
     unreadInputs.length > 0
       ? `\n## 待处理的人类插话 / 返工 / 事件输入 (Inputs)\n` +
@@ -84,7 +103,7 @@ export function buildWorkerBriefing(params: {
 - 任务号：${task.identifier} (内部 ID: ${task.id})
 - 标题：${task.title}
 - 队长委派指令：${orderText}
-${prevVerdictSection}${inputsSection}
+${prevVerdictSection}${inputsSection}${buildMemoriesSection(memories)}
 
 ## 汇报与协作原语（通过 bash 工具调用）
 1. 汇报进度或提出需要人类拍板的问题（可边提问边继续干确定性的活）：
@@ -93,7 +112,9 @@ ${prevVerdictSection}${inputsSection}
    \`nocturn report --task ${task.identifier} --agent ${worker.id} --state ready --risk low --summary "<完成摘要与测试结果>" --pr <PR编号>\`
 3. 若你是审查员（codex-reviewer）且发现代码或测试有缺陷，直接调用 \`--state rework\` **自动打回给 pi-coder 原会话返工**（无需人类介入）：
    \`nocturn report --task ${task.identifier} --agent ${worker.id} --state rework --summary "<具体缺陷与返工要求>"\`
-4. 若收到的评论超出本任务范围，退回给队长另建新任务：
+4. 查询/沉淀经验记忆（干活前先检索相关教训，可少走弯路）：
+   \`nocturn memory search --agent ${worker.id} --q "<关键词>"\` / \`nocturn memory write --agent ${worker.id} --kind lesson --text "<经验教训>" --tags "标签1,标签2"\`
+5. 若收到的评论超出本任务范围，退回给队长另建新任务：
    \`nocturn handback --task ${task.identifier} --trigger <triggerId> --reason "<越界说明>"\`
 `;
 }
