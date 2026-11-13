@@ -351,7 +351,7 @@ export class SotaPiRunner {
     const prompt = this.buildBriefingForTaskAgent(run.taskId, run.agentId, run.summary, memories);
 
     try {
-      await this.runLiveOnSota({
+      const result = await this.runLiveOnSota({
         runId: run.id,
         agentId: run.agentId,
         worktreePath: refreshed.worktreePath,
@@ -359,11 +359,21 @@ export class SotaPiRunner {
         model,
         prompt,
       });
+      // A pi process that exits non-zero without emitting any JSON events (bad model id,
+      // missing auth, binary missing...) must not leave the Run "running" forever.
+      if (result.code !== 0 && result.rawLines.length === 0) {
+        this.engine.appendRunStep(run.id, {
+          badge: "步骤",
+          text: `[sota 执行异常] pi 进程退出码 ${result.code}，无任何事件输出: ${result.assistantText.slice(0, 300)}`,
+        });
+        this.engine.stopRun(run.id, `pi 进程异常退出 (code=${result.code})`);
+      }
     } catch (err) {
       this.engine.appendRunStep(run.id, {
         badge: "步骤",
         text: `[sota 执行异常] ${err instanceof Error ? err.message : String(err)}`,
       });
+      this.engine.stopRun(run.id, `sota 执行异常: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
